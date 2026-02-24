@@ -257,6 +257,7 @@ class AgentTaskManager(TaskManager):
             while True:
                 event = await queue.get()
                 if event is None:  # End of stream
+                    await self.store.delete_task(task_id)
                     break
                 yield SendStreamingMessageResponse(
                     root=SendStreamingMessageSuccessResponse(
@@ -265,7 +266,6 @@ class AgentTaskManager(TaskManager):
                 )
 
         finally:
-            await self.store.delete_task(task_id)
             self.streaming_tasks.pop(task_id, None)
 
     def _create_ask_tool_message(
@@ -748,6 +748,7 @@ class AgentTaskManager(TaskManager):
             while True:
                 event = await queue.get()
                 if event is None:
+                    await self.store.delete_task(task_id)
                     break
 
                 yield SendStreamingMessageResponse(

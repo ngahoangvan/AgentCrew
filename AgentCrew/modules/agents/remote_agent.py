@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import asyncio
 from typing import Dict, TYPE_CHECKING
 from uuid import uuid4
 
+import httpx
+from loguru import logger
 from pydantic import ValidationError
 from AgentCrew.modules.a2a.adapters import (
     convert_agent_message_to_a2a,
@@ -130,51 +133,85 @@ class RemoteAgent(BaseAgent):
         a2a_payload = MessageSendParams(
             metadata={"id": str(uuid4())},
             message=a2a_message,
-            # acceptedOutputModes can be set here if needed, e.g., based on agent_card.defaultOutputModes
-            # For now, relying on server defaults or agent's capability.
         )
 
         full_response_text = ""
+        max_retries = 3
+        retry_count = 0
+        is_resubscribe = False
 
-        async for stream_response in self.client.send_message_streaming(a2a_payload):
-            if isinstance(stream_response.root, JSONRPCErrorResponse):
-                raise Exception(
-                    f"Remote agent stream error: {stream_response.root.error.code} - {stream_response.root.error.message}"
-                )
+        while retry_count <= max_retries:
+            try:
+                if is_resubscribe and self.current_task_id:
+                    logger.info(
+                        f"Resubscribing to task {self.current_task_id} "
+                        f"(attempt {retry_count})"
+                    )
+                    stream = self.client.resubscribe_to_task(self.current_task_id)
+                else:
+                    stream = self.client.send_message_streaming(a2a_payload)
 
-            if stream_response.root.result:
-                event = stream_response.root.result
-                current_content_chunk_text = ""
-                current_thinking_chunk_text = ""
-
-                if isinstance(event, TaskArtifactUpdateEvent):
-                    self.current_task_id = event.task_id
-                    for part in event.artifact.parts:
-                        if isinstance(part.root, TextPart):
-                            current_content_chunk_text += part.root.text
-                    if current_content_chunk_text:
-                        full_response_text += current_content_chunk_text
-                        yield (
-                            full_response_text,
-                            current_content_chunk_text,
-                            None,
+                async for stream_response in stream:
+                    if isinstance(stream_response.root, JSONRPCErrorResponse):
+                        raise Exception(
+                            f"Remote agent stream error: "
+                            f"{stream_response.root.error.code} - "
+                            f"{stream_response.root.error.message}"
                         )
 
-                elif isinstance(event, TaskStatusUpdateEvent):
-                    self.current_task_id = event.task_id
-                    if event.status.message and event.status.message.parts:
-                        for part in event.status.message.parts:
-                            if isinstance(part.root, TextPart):
-                                current_content_chunk_text += part.root.text
-                        if current_thinking_chunk_text:
-                            yield (
-                                full_response_text,
-                                None,
-                                (current_thinking_chunk_text, None),
-                            )
+                    if stream_response.root.result:
+                        event = stream_response.root.result
+                        current_content_chunk_text = ""
+                        current_thinking_chunk_text = ""
 
-        # After the loop, the generator stops. If full_response_text is empty,
-        # it signifies no textual content was streamed as artifacts.
+                        if isinstance(event, TaskArtifactUpdateEvent):
+                            self.current_task_id = event.task_id
+                            for part in event.artifact.parts:
+                                if isinstance(part.root, TextPart):
+                                    current_content_chunk_text += part.root.text
+                            if current_content_chunk_text:
+                                full_response_text += current_content_chunk_text
+                                yield (
+                                    full_response_text,
+                                    current_content_chunk_text,
+                                    None,
+                                )
+
+                        elif isinstance(event, TaskStatusUpdateEvent):
+                            self.current_task_id = event.task_id
+                            if event.status.message and event.status.message.parts:
+                                for part in event.status.message.parts:
+                                    if isinstance(part.root, TextPart):
+                                        current_content_chunk_text += part.root.text
+                                if current_thinking_chunk_text:
+                                    yield (
+                                        full_response_text,
+                                        None,
+                                        (current_thinking_chunk_text, None),
+                                    )
+
+                break
+
+            except (
+                httpx.ReadError,
+                httpx.RemoteProtocolError,
+                httpx.ReadTimeout,
+                ConnectionError,
+                httpx.ConnectError,
+            ) as e:
+                retry_count += 1
+                if retry_count > max_retries:
+                    logger.error(
+                        f"Failed to reconnect after {max_retries} attempts: {e}"
+                    )
+                    raise
+                wait_time = min(2**retry_count, 30)
+                logger.warning(
+                    f"Stream connection lost: {e}. "
+                    f"Retrying in {wait_time}s (attempt {retry_count}/{max_retries})"
+                )
+                await asyncio.sleep(wait_time)
+                is_resubscribe = True
 
     def get_process_result(self) -> Tuple:
         """

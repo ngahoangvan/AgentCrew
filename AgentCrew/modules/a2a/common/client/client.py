@@ -19,6 +19,8 @@ from a2a.types import (
     TaskPushNotificationConfig,
     SendStreamingMessageResponse,
     SetTaskPushNotificationConfigResponse,
+    TaskResubscriptionRequest,
+    TaskIdParams,
 )
 
 if TYPE_CHECKING:
@@ -33,7 +35,6 @@ if TYPE_CHECKING:
         SendMessageRequest,
         SendStreamingMessageRequest,
         SetTaskPushNotificationConfigRequest,
-        TaskIdParams,
         TaskQueryParams,
     )
 
@@ -131,3 +132,27 @@ class A2AClient:
         )
         result = await self._send_request(A2ARequest(root=request))
         return GetTaskPushNotificationConfigResponse.model_validate(result)
+
+    async def resubscribe_to_task(
+        self, task_id: str
+    ) -> AsyncGenerator[SendStreamingMessageResponse]:
+        request = TaskResubscriptionRequest(
+            id=str(uuid4()), params=TaskIdParams(id=task_id)
+        )
+        request_headers = {"Content-Type": "application/json", **self.headers}
+
+        async with httpx.AsyncClient(timeout=None) as client:
+            async with aconnect_sse(
+                client,
+                "POST",
+                self.url,
+                json=request.model_dump(),
+                headers=request_headers,
+            ) as event_source:
+                try:
+                    async for sse in event_source.aiter_sse():
+                        yield SendStreamingMessageResponse.model_validate(
+                            json.loads(sse.data)
+                        )
+                except json.JSONDecodeError as e:
+                    raise httpx.DecodingError(str(e)) from e
