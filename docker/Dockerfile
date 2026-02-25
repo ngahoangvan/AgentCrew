@@ -79,6 +79,14 @@ RUN apt-get update && apt-get install -y \
 
 RUN pip install --no-cache-dir uv
 
+# Allow to run node-based mcp
+ARG node_version=v24.4.1
+RUN cd /opt \
+  && curl -LO https://nodejs.org/dist/${node_version}/node-${node_version}-linux-x64.tar.xz \
+  && tar -xJf node-${node_version}-linux-x64.tar.xz \
+  && rm node-${node_version}-linux-x64.tar.xz
+ENV PATH=/opt/node-${node_version}-linux-x64/bin:${PATH}
+
 # Create non-root user
 RUN groupadd -r agentcrew && useradd -r -g agentcrew -m -d /home/agentcrew agentcrew
 
