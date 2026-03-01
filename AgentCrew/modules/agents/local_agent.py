@@ -99,9 +99,6 @@ class LocalAgent(BaseAgent):
             self.services.get("agent_manager")
             and self.services["agent_manager"].enforce_transfer
         ):
-            self.tool_prompts.append(
-                self.services["agent_manager"].get_agents_list_prompt()
-            )
             # from AgentCrew.modules.agents.tools.delegate import (
             #     register as register_delegate,
             #     delegate_tool_prompt,
@@ -123,6 +120,10 @@ class LocalAgent(BaseAgent):
                 from AgentCrew.modules.agents.tools.transfer import (
                     register as register_transfer,
                     transfer_tool_prompt,
+                )
+
+                self.tool_prompts.append(
+                    self.services["agent_manager"].get_agents_list_prompt()
                 )
 
                 register_transfer(self.services["agent_manager"], self)
