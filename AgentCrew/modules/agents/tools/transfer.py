@@ -25,17 +25,8 @@ def get_transfer_tool_definition(provider="claude") -> Dict[str, Any]:
             "description": "A precise, actionable description of the task for the target agent. Start with action verbs (Create, Analyze, Design, Implement, etc.) and clearly state what the target agent needs to achieve. Include specific deliverables, success criteria, constraints, and any triggering keywords or phrases from the user that initiated the transfer. Think of this as the 'mission objective' for the other agent.",
         },
         "post_action": {
-            "type": "object",
-            "properties": {
-                "action_type": {
-                    "type": "string",
-                    "enum": ["transfer", "other"],
-                },
-                "action": {
-                    "type": "string",
-                    "description": "Defines the expected next action for the target agent after it has completed its assigned task. Examples: 'ask user for next phase', 'report completion status', 'transfer to [specific agent] for implementation'. Omit if task completion is the final objective.",
-                },
-            },
+            "type": "string",
+            "description": "Defines the expected next action for the target agent after it has completed its assigned task. Examples: 'transfer to [specific agent] for implementation'. Omit if task completion is the final objective.",
         },
     }
 
@@ -94,7 +85,7 @@ def get_transfer_tool_handler(agent_manager: AgentManager) -> Callable:
         """
         target_agent = params.get("target_agent")
         task = params.get("task_description")
-        post_action = params.get("post_action", {})
+        post_action = params.get("post_action", "")
 
         if not target_agent:
             raise ValueError("Error: No target agent specified")
@@ -121,10 +112,8 @@ def get_transfer_tool_handler(agent_manager: AgentManager) -> Callable:
             if result["transfer"].get("included_conversations", []):
                 response += f"  <Shared_Context>    \n{'    \n'.join(result['transfer'].get('included_conversations', []))}\n  </Shared_Context>\n"
 
-            if post_action.get("action_type", "other") == "transfer":
-                agent_manager.defered_transfer = post_action.get("action", "")
-            else:
-                response += f"  <Chaining_Task Priority='Mandatory'>{post_action.get('action', '')}</Chaining_Task>\n"
+            if post_action:
+                agent_manager.defered_transfer = post_action
 
             response += "</Transfer_Tool>"
 

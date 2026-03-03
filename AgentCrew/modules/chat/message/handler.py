@@ -460,6 +460,21 @@ class MessageHandler(Observable):
                 self.current_user_input = None
                 self.current_user_input_idx = -1
 
+            if self.agent_manager.defered_transfer:
+                self.agent.history.append(
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": f"""<Transfer_Post_Action_Reminder>{self.agent_manager.defered_transfer}. If action related to other agent, use `transfer` tool to chaining the work</Transfer_Post_Action_Reminder>""",
+                            }
+                        ],
+                    }
+                )
+                self.agent_manager.defered_transfer = ""
+                return await self.get_assistant_response()
+
             return assistant_response, input_tokens, output_tokens
 
         except GeneratorExit:

@@ -680,29 +680,6 @@ Whenever condition on `when` clause in a **Behavior** matches, tailor your respo
         if len(adaptive_messages["content"]) > 0:
             final_messages.insert(last_user_index, adaptive_messages)
 
-        agent_manager = self.services.get("agent_manager", None)
-        if agent_manager and agent_manager.defered_transfer:
-            last_assistant_index = next(
-                (
-                    i
-                    for i, msg in enumerate(reversed(final_messages))
-                    if msg.get("role") == "assistant"
-                ),
-                -1,
-            )
-            final_messages.insert(
-                last_assistant_index,
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": f"""<Transfer_Reminder>Make sure to transfer the task result after the task is completed to {agent_manager.defered_transfer}</Transfer_Reminder>""",
-                        }
-                    ],
-                },
-            )
-
     def _clean_shrinkable_tool_result(self, final_messages: List[Dict[str, Any]]):
         """
         Clean unique tool results by replacing all but the last [UNIQUE] tool result with "[INVALIDATED]".
@@ -745,28 +722,6 @@ Whenever condition on `when` clause in a **Behavior** matches, tailor your respo
             elif msg.get("role") == "tool":
                 tool_name = msg.get("tool_name", "")
 
-                # TODO: this will be failed if agent call tool in parallel
-                # # Remove denied tools after agent correct it
-                # if msg.get("is_rejected", False):
-                #     has_last_user_message = next(
-                #         (True for _ in final_messages[i:] if msg.get("role") == "user"),
-                #         False,
-                #     )
-                #     if has_last_user_message:
-                #         tool_id = msg.get("tool_call_id", "")
-                #         last_assistant_msg = final_messages[i - 1]
-                #         for tool_call in last_assistant_msg.get("tool_calls", []):
-                #             if tool_call.get("id", "") == tool_id:
-                #                 tool_call["arguments"] = {}
-                #                 break
-
-                if tool_name in shrink_excluded:
-                    continue
-
-                if is_shrinkable and i < shrink_threshold:
-                    msg["content"] = "[PRUNED]"
-                    continue
-
                 # Check if content starts with [UNIQUE]
                 content = msg.get("content", "")
                 if (
@@ -788,6 +743,29 @@ Whenever condition on `when` clause in a **Behavior** matches, tailor your respo
                         > 0
                     ):
                         unique_tool_indices.append(i)
+                        continue
+
+                # TODO: this will be failed if agent call tool in parallel
+                # # Remove denied tools after agent correct it
+                # if msg.get("is_rejected", False):
+                #     has_last_user_message = next(
+                #         (True for _ in final_messages[i:] if msg.get("role") == "user"),
+                #         False,
+                #     )
+                #     if has_last_user_message:
+                #         tool_id = msg.get("tool_call_id", "")
+                #         last_assistant_msg = final_messages[i - 1]
+                #         for tool_call in last_assistant_msg.get("tool_calls", []):
+                #             if tool_call.get("id", "") == tool_id:
+                #                 tool_call["arguments"] = {}
+                #                 break
+
+                if tool_name in shrink_excluded:
+                    continue
+
+                if is_shrinkable and i < shrink_threshold:
+                    msg["content"] = "[PRUNED]"
+                    continue
 
         # Replace all but the last [UNIQUE] tool result with "[INVALIDATED]"
         if len(unique_tool_indices) > 1:

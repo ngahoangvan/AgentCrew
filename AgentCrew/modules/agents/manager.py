@@ -571,7 +571,7 @@ When system access is requested:
 
       4. **POST_ACTION_SPECIFICATION:**
          • Define next steps following Post_Action_Templates when logical continuation exists
-         • Examples: "ask user for next phase", "report completion status", "transfer to [specific agent] for implementation"
+         • Examples: "transfer to [specific agent] for implementation"
          • Omit if task completion is the final objective
     </Transfer_Execution_Rules>
     
