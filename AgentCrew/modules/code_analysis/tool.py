@@ -395,7 +395,7 @@ def get_grep_text_tool_definition(provider="claude") -> Dict[str, Any]:
     Returns:
         Dict containing the tool definition in provider-specific format
     """
-    description = "Searches for text patterns within files in a specified directory using grep-like functionality. "
+    description = "Searches for text patterns within files in a specified directory or a single file using grep-like functionality. "
 
     tool_arguments = {
         "pattern": {
@@ -407,11 +407,12 @@ def get_grep_text_tool_definition(provider="claude") -> Dict[str, Any]:
                 "'import .*' (regex for import statements), '^class ' (regex for class definitions at line start). "
             ),
         },
-        "directory": {
+        "path": {
             "type": "string",
             "description": (
-                "The directory path to search within. Use '.' for current directory, "
-                "or specify a subdirectory path like 'src', 'tests', or 'lib/utils'."
+                "The file or directory path to search within. Use '.' for current directory, "
+                "specify a subdirectory path like 'src', 'tests', or 'lib/utils', "
+                "or specify a single file path like 'src/main.py' to search only that file."
             ),
             "default": ".",
         },
@@ -478,7 +479,7 @@ def get_grep_text_tool_handler(service_instance: GrepTextService) -> Callable:
         Args:
             **params: Tool parameters from LLM
                 - pattern (str, required): Regex pattern to search for
-                - directory (str, required): Directory to search in (default: ".")
+                - path (str, optional): File or directory to search in (default: ".")
                 - case_sensitive (bool, optional): Enable case sensitivity (default: True)
                 - max_results (int, optional): Maximum results to return (default: None)
 
@@ -489,7 +490,7 @@ def get_grep_text_tool_handler(service_instance: GrepTextService) -> Callable:
             Exception: For parameter validation errors or search failures
         """
         pattern = params.get("pattern")
-        directory = params.get("directory", ".")
+        path = params.get("path") or params.get("directory", ".")
         case_sensitive = params.get("case_sensitive", True)
         max_results = params.get("max_results", 50)
 
@@ -524,18 +525,17 @@ def get_grep_text_tool_handler(service_instance: GrepTextService) -> Callable:
                 raise Exception(error_msg)
 
         # Expand user directory if present (e.g., ~/project -> /home/user/project)
-        expanded_directory = os.path.expanduser(directory)
+        expanded_path = os.path.expanduser(path)
 
         logger.info(
-            f"grep_text tool called with: pattern='{pattern}', directory='{expanded_directory}', "
+            f"grep_text tool called with: pattern='{pattern}', path='{expanded_path}', "
             f"case_sensitive={case_sensitive}, max_results={max_results}"
         )
 
         try:
-            # search_text now returns a formatted string
             result_text = service_instance.search_text(
                 pattern=pattern,
-                directory=expanded_directory,
+                path=expanded_path,
                 case_sensitive=case_sensitive,
                 max_results=max_results,
             )

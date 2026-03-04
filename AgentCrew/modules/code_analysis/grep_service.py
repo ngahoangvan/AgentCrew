@@ -164,44 +164,43 @@ class GrepTextService:
             logger.error(error_msg)
             raise GrepTextError(error_msg) from e
 
-    def _validate_directory(self, directory: str) -> str:
+    def _validate_path(self, path: str) -> str:
         """
-        Validate that the directory path is valid and accessible.
+        Validate that the path (file or directory) is valid and accessible.
 
         Args:
-            directory: Directory path to validate
+            path: File or directory path to validate
 
         Returns:
-            str: Absolute path of the validated directory
+            str: Absolute path of the validated path
 
         Raises:
-            GrepTextError: If directory is invalid or inaccessible
+            GrepTextError: If path is invalid or inaccessible
         """
-        if not directory or not directory.strip():
-            error_msg = "Directory path cannot be empty"
+        if not path or not path.strip():
+            error_msg = "Path cannot be empty"
             logger.error(error_msg)
             raise GrepTextError(error_msg)
 
-        if not os.path.exists(directory):
-            error_msg = f"Directory does not exist: {directory}"
+        if not os.path.exists(path):
+            error_msg = f"Path does not exist: {path}"
             logger.error(error_msg)
             raise GrepTextError(error_msg)
 
-        if not os.path.isdir(directory):
-            error_msg = f"Path is not a directory: {directory}"
+        if not os.path.isdir(path) and not os.path.isfile(path):
+            error_msg = f"Path is not a file or directory: {path}"
             logger.error(error_msg)
             raise GrepTextError(error_msg)
 
-        if not os.access(directory, os.R_OK):
-            error_msg = f"Permission denied: Cannot read directory '{directory}'"
+        if not os.access(path, os.R_OK):
+            error_msg = f"Permission denied: Cannot read '{path}'"
             logger.error(error_msg)
             raise GrepTextError(error_msg)
 
-        # Convert to absolute path for consistency
-        abs_directory = os.path.abspath(directory)
-        logger.debug(f"Directory validated: {abs_directory}")
+        abs_path = os.path.abspath(path)
+        logger.debug(f"Path validated: {abs_path}")
 
-        return abs_directory
+        return abs_path
 
     def _is_git_repository(self, directory: str) -> bool:
         """
@@ -249,7 +248,7 @@ class GrepTextService:
     def _build_grep_command(
         self,
         pattern: str,
-        directory: str,
+        path: str,
         case_sensitive: bool,
     ) -> str:
         """
@@ -257,29 +256,32 @@ class GrepTextService:
 
         Args:
             pattern: Search pattern (already validated regex)
-            directory: Directory to search in
+            path: File or directory path to search in
             case_sensitive: Whether search is case-sensitive
 
         Returns:
             str: Command string ready for execution
         """
-        # Escape pattern for shell safety
         escaped_pattern = pattern.replace("'", "'\\''")
 
-        # grep command building (always use extended regex)
         cmd_parts = [
             "grep",
-            "-r",  # Recursive
-            "-n",  # Line numbers
-            "-H",  # Always show filename
-            "-E",  # Extended regex
         ]
+
+        if os.path.isdir(path):
+            cmd_parts.append("-r")
+
+        cmd_parts.extend([
+            "-n",
+            "-H",
+            "-E",
+        ])
 
         if not case_sensitive:
             cmd_parts.append("-i")
 
         cmd_parts.append(f"'{escaped_pattern}'")
-        cmd_parts.append(f"'{directory}'")
+        cmd_parts.append(f"'{path}'")
 
         command = " ".join(cmd_parts)
         logger.debug(f"Built grep command: {command}")
@@ -288,7 +290,7 @@ class GrepTextService:
     def _build_git_grep_command(
         self,
         pattern: str,
-        directory: str,
+        path: str,
         case_sensitive: bool,
     ) -> str:
         """
@@ -296,26 +298,31 @@ class GrepTextService:
 
         Args:
             pattern: Search pattern (already validated regex)
-            directory: Directory to search in (must be within a git repo)
+            path: File or directory path to search in (must be within a git repo)
             case_sensitive: Whether search is case-sensitive
 
         Returns:
             str: Command string ready for execution
         """
-        # Escape pattern for shell safety
-        if self._is_windows:
-            # Windows/CMD escaping
-            escaped_pattern = pattern.replace('"', '""')
-            escaped_directory = directory.replace('"', '""')
+        is_file = os.path.isfile(path)
 
-            # git grep command building
+        if self._is_windows:
+            escaped_pattern = pattern.replace('"', '""')
+
+            if is_file:
+                search_dir = os.path.dirname(path) or "."
+                escaped_directory = search_dir.replace('"', '""')
+                escaped_file = os.path.basename(path).replace('"', '""')
+            else:
+                escaped_directory = path.replace('"', '""')
+
             cmd_parts = [
                 f'cd /d "{escaped_directory}" &&',
                 "git",
                 "grep",
-                "-n",  # Show line numbers
-                "--full-name",  # Show full paths relative to repo root
-                "-E",  # Extended regex
+                "-n",
+                "--full-name",
+                "-E",
             ]
 
             if not case_sensitive:
@@ -323,26 +330,36 @@ class GrepTextService:
 
             cmd_parts.append(f'"{escaped_pattern}"')
 
+            if is_file:
+                cmd_parts.append(f'-- "{escaped_file}"')
+
             command = " ".join(cmd_parts)
         else:
-            # Unix escaping
             escaped_pattern = pattern.replace("'", "'\\''")
-            escaped_directory = directory.replace("'", "'\\''")
 
-            # git grep command building
+            if is_file:
+                search_dir = os.path.dirname(path) or "."
+                escaped_directory = search_dir.replace("'", "'\\''")
+                escaped_file = os.path.basename(path).replace("'", "'\\''")
+            else:
+                escaped_directory = path.replace("'", "'\\''")
+
             cmd_parts = [
                 f"cd '{escaped_directory}' &&",
                 "git",
                 "grep",
-                "-n",  # Show line numbers
-                "--full-name",  # Show full paths relative to repo root
-                "-E",  # Extended regex
+                "-n",
+                "--full-name",
+                "-E",
             ]
 
             if not case_sensitive:
                 cmd_parts.append("-i")
 
             cmd_parts.append(f"'{escaped_pattern}'")
+
+            if is_file:
+                cmd_parts.append(f"-- '{escaped_file}'")
 
             command = " ".join(cmd_parts)
 
@@ -352,37 +369,35 @@ class GrepTextService:
     def _build_rg_command(
         self,
         pattern: str,
-        directory: str,
+        path: str,
         case_sensitive: bool,
     ) -> str:
         """
-        Build ripgrep (rg) command for Unix systems.
+        Build ripgrep (rg) command.
 
         Args:
             pattern: Search pattern (already validated regex)
-            directory: Directory to search in
+            path: File or directory path to search in
             case_sensitive: Whether search is case-sensitive
 
         Returns:
             str: Command string ready for execution
         """
-        # Escape pattern for shell safety
         escaped_pattern = pattern.replace("'", "'\\''")
 
-        # ripgrep command building
         cmd_parts = [
             "rg",
-            "--line-number",  # Show line numbers
-            "--no-heading",  # Don't group by file
-            "--with-filename",  # Always show filename
-            "--hidden",  # Search hidden files
+            "--line-number",
+            "--no-heading",
+            "--with-filename",
+            "--hidden",
         ]
 
         if not case_sensitive:
             cmd_parts.append("--ignore-case")
 
         cmd_parts.append(f"'{escaped_pattern}'")
-        cmd_parts.append(f"'{directory}'")
+        cmd_parts.append(f"'{path}'")
 
         command = " ".join(cmd_parts)
         logger.debug(f"Built rg command: {command}")
@@ -391,7 +406,7 @@ class GrepTextService:
     def _build_windows_command(
         self,
         pattern: str,
-        directory: str,
+        path: str,
         case_sensitive: bool,
     ) -> str:
         """
@@ -399,28 +414,33 @@ class GrepTextService:
 
         Args:
             pattern: Search pattern
-            directory: Directory to search in
+            path: File or directory path to search in
             case_sensitive: Whether search is case-sensitive
 
         Returns:
             str: Command string ready for execution
         """
-        # PowerShell Select-String command (regex mode always enabled)
-        # Escape for PowerShell string literals
-        escaped_directory = directory.replace("'", "''")
+        escaped_path = path.replace("'", "''")
         escaped_pattern = pattern.replace("'", "''").replace('"', '`"')
 
-        ps_parts = [
-            f'Get-ChildItem -Path "{escaped_directory}" -Recurse -File',
-            "|",
-            f'Select-String -Pattern "{escaped_pattern}"',
-        ]
+        is_file = os.path.isfile(path)
 
-        # Select-String is case-insensitive by default, use -CaseSensitive for sensitive
+        if is_file:
+            ps_parts = [
+                f'Get-Content -Path "{escaped_path}"',
+                "|",
+                f'Select-String -Pattern "{escaped_pattern}"',
+            ]
+        else:
+            ps_parts = [
+                f'Get-ChildItem -Path "{escaped_path}" -Recurse -File',
+                "|",
+                f'Select-String -Pattern "{escaped_pattern}"',
+            ]
+
         if case_sensitive:
             ps_parts.append("-CaseSensitive")
 
-        # Format output as "filename:line_number:line_content"
         ps_parts.append('| ForEach-Object { "$($_.Path):$($_.LineNumber):$($_.Line)" }')
 
         ps_command = " ".join(ps_parts)
@@ -563,17 +583,17 @@ class GrepTextService:
     def search_text(
         self,
         pattern: str,
-        directory: str,
+        path: str,
         case_sensitive: bool = True,
         max_results: Optional[int] = None,
     ) -> str:
         """
-        Search for text patterns within files in the specified directory.
+        Search for text patterns within a file or files in the specified directory.
 
         Args:
             pattern: The regular expression pattern to search for.
-            directory: The directory path to search within. Use './' for current directory.
-                      Must be a valid, readable directory path.
+            path: The file or directory path to search within. Use './' for current directory.
+                  Must be a valid, readable path.
             case_sensitive: Boolean flag to control case sensitivity of the search.
                            Default: True (case-sensitive)
             max_results: Maximum number of results to return. None for unlimited.
@@ -589,39 +609,35 @@ class GrepTextService:
                 ...
 
         Raises:
-            GrepTextError: If parameters are invalid, directory is inaccessible,
+            GrepTextError: If parameters are invalid, path is inaccessible,
                           pattern is malformed, or search execution fails
         """
-        # Validate inputs
-        directory = self._validate_directory(directory)
+        path = self._validate_path(path)
 
         if max_results is not None and max_results < 0:
             error_msg = f"max_results must be non-negative, got: {max_results}"
             logger.error(error_msg)
             raise GrepTextError(error_msg)
 
-        # Validate pattern (always treated as regex)
         validated_pattern = self._validate_pattern(pattern)
 
         logger.info(
-            f"Searching for pattern '{pattern}' in '{directory}' "
+            f"Searching for pattern '{pattern}' in '{path}' "
             f"(regex=True, case_sensitive={case_sensitive}, "
             f"max_results={max_results})"
         )
 
-        # Check if directory is a git repository
-        is_git_repo = self._is_git_repository(directory)
+        git_check_dir = path if os.path.isdir(path) else os.path.dirname(path)
+        is_git_repo = self._is_git_repository(git_check_dir)
 
-        # Determine available tools, filtering out git-grep if not a git repo
         tool_priority = self._get_tool_priority()
         if not is_git_repo:
-            # Remove git-grep from priority list if not in a git repo
             tool_priority = [tool for tool in tool_priority if tool != "git-grep"]
             logger.debug(
-                "Directory is not a git repository, excluding git-grep from tools"
+                "Path is not in a git repository, excluding git-grep from tools"
             )
         else:
-            logger.debug("Directory is a git repository, git-grep is available")
+            logger.debug("Path is in a git repository, git-grep is available")
 
         used_tool = ""
         for tool in tool_priority:
@@ -634,19 +650,19 @@ class GrepTextService:
         try:
             if used_tool == "grep":
                 command = self._build_grep_command(
-                    validated_pattern, directory, case_sensitive
+                    validated_pattern, path, case_sensitive
                 )
             elif used_tool == "rg":
                 command = self._build_rg_command(
-                    validated_pattern, directory, case_sensitive
+                    validated_pattern, path, case_sensitive
                 )
             elif used_tool == "git-grep":
                 command = self._build_git_grep_command(
-                    validated_pattern, directory, case_sensitive
+                    validated_pattern, path, case_sensitive
                 )
             elif used_tool == "Select-String":
                 command = self._build_windows_command(
-                    validated_pattern, directory, case_sensitive
+                    validated_pattern, path, case_sensitive
                 )
             else:
                 error_msg = f"Unsupported selected tool: {used_tool}"
