@@ -660,11 +660,11 @@ Whenever condition on `when` clause in a **Behavior** matches, tailor your respo
                     {
                         "type": "text",
                         "text": """Before processing my request:
-            - Break my request into actionable sub-tasks when applicable.
-            - For each sub-task, evaluate your tools and plan tool strategy for acquiring the context you need for the main task.
+            - Break my request into actionable sub-tasks by evaluating your tools and plan tool strategy for acquiring the context you need when applicable.
+            - Make sure each sub-tasks is assigned with the most suitable agent if you have multiple agents under your control.
             - Action subsequent steps base on your plan.
             - Keep the evaluating quick and concise using xml format within <agent_evaluation> tags.
-            - Skip agent evaluation if user request is when...,[action]... related to adaptive behaviors call `adapt` tool instead.""",
+            - Skip agent evaluation if user request is when...,[action]... related to adaptive behaviors call `learn_behavior` tool instead.""",
                     },
                 )
         if last_user_index == 0:
@@ -673,7 +673,7 @@ Whenever condition on `when` clause in a **Behavior** matches, tailor your respo
                 adaptive_messages["content"].append(
                     {
                         "type": "text",
-                        "text": f"cwd `{os.getcwd()}` structure:\n{dir_structure}",
+                        "text": f"current directory `{os.getcwd()}` has structure:\n{dir_structure}",
                     }
                 )
 
@@ -745,7 +745,6 @@ Whenever condition on `when` clause in a **Behavior** matches, tailor your respo
                         unique_tool_indices.append(i)
                         continue
 
-                # TODO: this will be failed if agent call tool in parallel
                 # # Remove denied tools after agent correct it
                 # if msg.get("is_rejected", False):
                 #     has_last_user_message = next(

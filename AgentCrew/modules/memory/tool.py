@@ -329,7 +329,7 @@ def adaptive_instruction_prompt():
     - Use `project` scope for behaviors relevant only to current project
   </Learn_Behavior_Triggers>
   <Behavior_Format>
-    Use the learn_behavior tool with:
+    Use the `learn_behavior` tool with:
     - condition: The triggering condition (e.g., "user asks about debugging")
     - action_steps: Array of action steps to execute when condition is met
     
