@@ -65,6 +65,12 @@ class TaskStore(ABC):
     async def cleanup_task(self, task_id: str) -> None:
         pass
 
+    async def close(self) -> None:
+        """Release any resources held by the store (e.g. connection pools).
+        Default is a no-op; override in stores that manage connections.
+        """
+        pass
+
     @staticmethod
     def deserialize_events(
         raw_events: List[Dict[str, Any]],

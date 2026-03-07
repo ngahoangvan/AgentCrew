@@ -4,6 +4,7 @@ A2A protocol server implementation for SwissKnife.
 
 import os
 import json
+from contextlib import asynccontextmanager
 from typing import Callable, Optional
 from starlette.applications import Starlette
 from starlette.responses import JSONResponse
@@ -75,6 +76,13 @@ class A2AServer:
             The configured Starlette application
         """
         logger.debug("Creating Starlette application")
+
+        @asynccontextmanager
+        async def lifespan(app):
+            yield
+            await self.task_manager.close()
+            logger.info("A2A server stopped — task stores closed.")
+
         routes: list[BaseRoute] = [
             Route("/agents", self._list_agents, methods=["GET"]),
         ]
@@ -106,7 +114,7 @@ class A2AServer:
             )
             routes.append(agent_routes)
 
-        return Starlette(routes=routes)
+        return Starlette(routes=routes, lifespan=lifespan)
 
     def _get_agent_card_factory(self, agent_name: str) -> Callable:
         """

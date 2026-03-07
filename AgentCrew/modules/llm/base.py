@@ -113,14 +113,11 @@ class BaseLLMService(ABC):
     def structured_output(self, value: Dict):
         self._structured_output = value
 
-    def _extract_tool_name(self, tool_def):
-        """Extract tool name from definition regardless of format"""
-        if "name" in tool_def:
-            return tool_def["name"]
-        elif "function" in tool_def and "name" in tool_def["function"]:
-            return tool_def["function"]["name"]
-        else:
-            raise ValueError("Could not extract tool name from definition")
+    def _extract_tool_name(self, tool_def) -> str:
+        """Extract tool name from definition regardless of format."""
+        from AgentCrew.modules.tools.utils import extract_tool_name
+
+        return extract_tool_name(tool_def)
 
     def parse_user_context_summary(
         self,

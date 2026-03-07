@@ -28,19 +28,13 @@ class ToolRegistry:
             service_instance: Instance of the service needed by the handler (optional)
         """
         # Call definition_func with default provider to get tool name
+        #
+        from AgentCrew.modules.tools.utils import extract_tool_name
+
         default_def = definition_func()
-        tool_name = self._extract_tool_name(default_def)
+        tool_name = extract_tool_name(default_def)
 
         self.tools[tool_name] = (definition_func, handler_factory, service_instance)
-
-    def _extract_tool_name(self, tool_def: Dict) -> str:
-        """Extract tool name from definition regardless of format"""
-        if "name" in tool_def:
-            return tool_def["name"]
-        elif "function" in tool_def and "name" in tool_def["function"]:
-            return tool_def["function"]["name"]
-        else:
-            raise ValueError("Could not extract tool name from definition")
 
     def get_tool_definitions(self, provider: str) -> List[Dict[str, Any]]:
         """Get all tool definitions formatted for the specified provider"""

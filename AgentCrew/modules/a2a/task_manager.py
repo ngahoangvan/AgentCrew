@@ -826,3 +826,8 @@ class MultiAgentTaskManager:
 
     def get_task_manager(self, agent_name: str) -> Optional[AgentTaskManager]:
         return self.agent_task_managers.get(agent_name)
+
+    async def close(self) -> None:
+        """Close all underlying task stores and release their resources."""
+        for manager in self.agent_task_managers.values():
+            await manager.store.close()

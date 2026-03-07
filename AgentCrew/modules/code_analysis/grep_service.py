@@ -271,11 +271,13 @@ class GrepTextService:
         if os.path.isdir(path):
             cmd_parts.append("-r")
 
-        cmd_parts.extend([
-            "-n",
-            "-H",
-            "-E",
-        ])
+        cmd_parts.extend(
+            [
+                "-n",
+                "-H",
+                "-E",
+            ]
+        )
 
         if not case_sensitive:
             cmd_parts.append("-i")

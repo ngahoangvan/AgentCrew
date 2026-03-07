@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime
 import os
-import time
 import copy
 from typing import List, TYPE_CHECKING
 
@@ -64,24 +64,10 @@ class LocalAgent(BaseAgent):
         self.mcps_loading = []
 
     def _extract_tool_name(self, tool_def: Any) -> str:
-        """
-        Extract tool name from definition regardless of format.
+        """Extract tool name from definition regardless of format."""
+        from AgentCrew.modules.tools.utils import extract_tool_name
 
-        Args:
-            tool_def: The tool definition
-
-        Returns:
-            The name of the tool
-
-        Raises:
-            ValueError: If the tool name cannot be extracted
-        """
-        if "name" in tool_def:
-            return tool_def["name"]
-        elif "function" in tool_def and "name" in tool_def["function"]:
-            return tool_def["function"]["name"]
-        else:
-            raise ValueError("Could not extract tool name from definition")
+        return extract_tool_name(tool_def)
 
     def append_message(self, messages: Union[Dict, List[Dict]]):
         copy_messages = copy.deepcopy(messages)
@@ -745,20 +731,6 @@ Whenever condition on `when` clause in a **Behavior** matches, tailor your respo
                         unique_tool_indices.append(i)
                         continue
 
-                # # Remove denied tools after agent correct it
-                # if msg.get("is_rejected", False):
-                #     has_last_user_message = next(
-                #         (True for _ in final_messages[i:] if msg.get("role") == "user"),
-                #         False,
-                #     )
-                #     if has_last_user_message:
-                #         tool_id = msg.get("tool_call_id", "")
-                #         last_assistant_msg = final_messages[i - 1]
-                #         for tool_call in last_assistant_msg.get("tool_calls", []):
-                #             if tool_call.get("id", "") == tool_id:
-                #                 tool_call["arguments"] = {}
-                #                 break
-
                 if tool_name in shrink_excluded:
                     continue
 
@@ -802,7 +774,7 @@ Whenever condition on `when` clause in a **Behavior** matches, tailor your respo
 
         if self._defer_tool_registration:
             while len(self.mcps_loading) > 0:
-                time.sleep(0.2)
+                await asyncio.sleep(0.2)
             self._register_tools_with_llm()
 
         assistant_response = ""
@@ -820,7 +792,6 @@ Whenever condition on `when` clause in a **Behavior** matches, tailor your respo
                 )  # This will prevent llm converting message break the original format
             ) as stream:
                 async for chunk in stream:
-                    # Process the chunk using the LLM service
                     (
                         assistant_response,
                         tool_uses,

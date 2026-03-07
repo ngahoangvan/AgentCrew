@@ -29,13 +29,25 @@ class RedisTaskStore(TaskStore):
             try:
                 import redis.asyncio as aioredis
 
-                self._redis = aioredis.from_url(self._redis_url, decode_responses=True)
+                self._redis = aioredis.from_url(
+                    self._redis_url,
+                    decode_responses=True,
+                    max_connections=20,
+                    socket_keepalive=True,
+                    health_check_interval=30,
+                )
             except ImportError:
                 raise ImportError(
                     "redis package is required for RedisTaskStore. "
                     "Install it with: uv add redis"
                 )
         return self._redis
+
+    async def close(self) -> None:
+        """Close the Redis connection pool and release all connections."""
+        if self._redis is not None:
+            await self._redis.aclose()
+            self._redis = None
 
     def _key(self, namespace: str, id: str) -> str:
         return f"{self.prefix}:{namespace}:{id}"

@@ -1,8 +1,8 @@
 from typing import Tuple, Optional, List
+import asyncio
 import os
 import shlex
 import traceback
-import time
 
 from loguru import logger
 from AgentCrew.modules.agents.base import MessageType
@@ -264,7 +264,7 @@ class MessageHandler(Observable):
                         self._notify("thinking_started", self.agent.name)
                         if not self.agent.is_streaming():
                             # Delays it a bit when using without stream
-                            time.sleep(0.5)
+                            await asyncio.sleep(0.5)
                         start_thinking = True
                     if think_text_chunk:
                         thinking_content += think_text_chunk
@@ -279,7 +279,7 @@ class MessageHandler(Observable):
                     # Notify about response progress
                     if not self.agent.is_streaming():
                         # Delays it a bit when using without stream
-                        time.sleep(0.3)
+                        await asyncio.sleep(0.3)
                     self._notify("response_chunk", (chunk_text, assistant_response))
                     if voice_sentence is not None:
                         if (
