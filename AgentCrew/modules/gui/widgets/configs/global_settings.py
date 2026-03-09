@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Signal
 
 from AgentCrew.modules.config import ConfigManagement
+from AgentCrew.modules.config.global_config import GlobalConfig
 from AgentCrew.modules.gui.themes import StyleProvider
 
 
@@ -92,7 +93,7 @@ class SettingsTab(QWidget):
     def __init__(self, config_manager: ConfigManagement):
         super().__init__()
         self.config_manager = config_manager
-        self.global_config = self.config_manager.read_global_config_data()
+        self.global_config = GlobalConfig().read()
 
         self.api_key_inputs = {}
         self.theme_dropdown = None
@@ -260,7 +261,7 @@ class SettingsTab(QWidget):
 
         try:
             # Save the configuration
-            self.config_manager.write_global_config_data(self.global_config)
+            GlobalConfig().write(self.global_config)
 
             # Get the style provider and update the theme
             style_provider = StyleProvider()

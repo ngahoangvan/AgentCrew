@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, Signal
 
 from AgentCrew.modules.config import ConfigManagement
+from AgentCrew.modules.config.mcp_config import MCPConfig
 from AgentCrew.modules.agents import AgentManager
 from AgentCrew.modules.gui.widgets.json_editor import JsonEditor
 from AgentCrew.modules.gui.themes import StyleProvider
@@ -44,7 +45,7 @@ class MCPsConfigTab(QWidget):
         self.save_worker = None
 
         # Load MCP configuration
-        self.mcps_config = self.config_manager.read_mcp_config()
+        self.mcps_config = MCPConfig().read()
 
         self.init_ui()
         self.load_mcps()
@@ -793,7 +794,7 @@ class MCPsConfigTab(QWidget):
 
     def _perform_mcp_save(self, mcps_config):
         """Perform the actual save operation (runs in worker thread)."""
-        self.config_manager.write_mcp_config(mcps_config)
+        MCPConfig().write(mcps_config)
 
     def _on_save_complete(self):
         """Handle successful save completion."""

@@ -23,6 +23,7 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QDoubleValidator
 
 from AgentCrew.modules.config import ConfigManagement
+from AgentCrew.modules.config.agents_config import AgentsConfig
 from AgentCrew.modules.agents import AgentManager
 from AgentCrew.modules.memory.context_persistent import ContextPersistenceService
 
@@ -55,7 +56,7 @@ class AgentsConfigTab(QWidget):
         ]
 
         # Load agents configuration
-        self.agents_config = self.config_manager.read_agents_config()
+        self.agents_config = AgentsConfig().read()
         self._is_dirty = False
         self.current_agent_behaviors = {}  # Cache for current agent's behaviors
 
@@ -886,7 +887,6 @@ class AgentsConfigTab(QWidget):
             return
 
         try:
-            # First, try to load to check for conflicts
             temp_config = ConfigManagement(import_file_path)
             imported_config = temp_config.get_config()
 
@@ -958,8 +958,7 @@ class AgentsConfigTab(QWidget):
                 else:
                     return  # User canceled
 
-            # Use ConfigManagement to import agents
-            result = self.config_manager.import_agents(
+            result = AgentsConfig().import_agents(
                 import_file_path, merge_strategy="update", skip_conflicts=skip_conflicts
             )
 
@@ -1049,8 +1048,7 @@ class AgentsConfigTab(QWidget):
         )
 
         try:
-            # Use ConfigManagement to export agents
-            result = self.config_manager.export_agents(
+            result = AgentsConfig().export(
                 agent_names, export_file_path, file_format=file_format
             )
 
@@ -1119,7 +1117,7 @@ class AgentsConfigTab(QWidget):
 
     def _perform_agent_save(self, config_data):
         """Perform the actual save operation (runs in worker thread)."""
-        self.config_manager.write_agents_config(config_data)
+        AgentsConfig().write(config_data)
 
     def _on_save_complete(self):
         """Handle successful save completion."""

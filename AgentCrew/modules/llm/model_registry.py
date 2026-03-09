@@ -2,7 +2,7 @@ from typing import Dict, List, Optional
 from .types import Model
 from .constants import AVAILABLE_MODELS
 from loguru import logger
-from AgentCrew.modules.config import ConfigManagement
+from AgentCrew.modules.config.global_config import GlobalConfig
 
 
 class ModelRegistry:
@@ -58,8 +58,7 @@ class ModelRegistry:
     def _load_custom_models_from_config(self):
         """Loads models from custom LLM provider configurations and registers them."""
         try:
-            config_manager = ConfigManagement()
-            custom_providers_config = config_manager.read_custom_llm_providers_config()
+            custom_providers_config = GlobalConfig().read_custom_llm_providers_config()
 
             for provider_config in custom_providers_config:
                 provider_name = provider_config.get("name")

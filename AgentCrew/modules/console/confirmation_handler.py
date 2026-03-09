@@ -186,10 +186,9 @@ class ConfirmationHandler:
             )
             self.console.print(approved_text)
         elif response == choices[3]:
-            from AgentCrew.modules.config import ConfigManagement
+            from AgentCrew.modules.config.global_config import GlobalConfig
 
-            config_manager = ConfigManagement()
-            config_manager.write_auto_approval_tools(tool_use["name"], add=True)
+            GlobalConfig().write_auto_approval_tools(tool_use["name"], add=True)
 
             message_handler.resolve_tool_confirmation(
                 confirmation_id, {"action": "approve_all"}

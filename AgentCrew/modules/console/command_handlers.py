@@ -17,7 +17,7 @@ from rich.table import Table
 from .constants import (
     RICH_STYLE_YELLOW,
 )
-from AgentCrew.modules.config.config_management import ConfigManagement
+from AgentCrew.modules.config.agents_config import AgentsConfig
 from loguru import logger
 
 from typing import TYPE_CHECKING, Dict
@@ -102,8 +102,7 @@ class CommandHandlers:
         )
 
         self.open_file_in_editor(agents_config_path)
-        config_mgmt = ConfigManagement()
-        config_mgmt.reload_agents_from_config()
+        AgentsConfig().reload()
 
     def handle_edit_mcp_command(self) -> None:
         """Handle the /edit_mcp command to open MCP configuration in default editor."""
@@ -119,8 +118,7 @@ class CommandHandlers:
         )
 
         self.open_file_in_editor(mcp_config_path)
-        config_mgmt = ConfigManagement()
-        config_mgmt.reload_agents_from_config()
+        AgentsConfig().reload()
 
     def handle_edit_config_command(self) -> None:
         """Handle the /edit_config command to open AgentCrew global configuration in default editor."""
@@ -136,8 +134,7 @@ class CommandHandlers:
         )
 
         self.open_file_in_editor(config_path)
-        config_mgmt = ConfigManagement()
-        config_mgmt.reload_agents_from_config()
+        AgentsConfig().reload()
 
     def handle_toggle_session_yolo_command(self) -> None:
         """Toggle session-level YOLO mode override for auto-approval of tool calls."""
@@ -177,11 +174,7 @@ class CommandHandlers:
                 )
                 return
 
-            # Use ConfigManagement to export agents
-            config_mgmt = ConfigManagement()
-            result = config_mgmt.export_agents(
-                agent_names, output_file, file_format="toml"
-            )
+            result = AgentsConfig().export(agent_names, output_file, file_format="toml")
 
             if not result["success"]:
                 self.console.print(
@@ -244,9 +237,7 @@ class CommandHandlers:
                     )
                 )
 
-            # Use ConfigManagement to import agents
-            config_mgmt = ConfigManagement()
-            result = config_mgmt.import_agents(
+            result = AgentsConfig().import_agents(
                 file_or_url, merge_strategy="update", skip_conflicts=False
             )
 

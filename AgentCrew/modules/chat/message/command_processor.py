@@ -7,7 +7,7 @@ from AgentCrew.modules.chat.file_handler import FileHandler
 from AgentCrew.modules.llm.model_registry import ModelRegistry
 from AgentCrew.modules.llm.service_manager import ServiceManager
 from AgentCrew.modules.chat.consolidation import ConversationConsolidator
-from AgentCrew.modules.config import ConfigManagement
+from AgentCrew.modules.config.global_config import GlobalConfig
 from AgentCrew.modules.agents.local_agent import LocalAgent
 import shlex
 from typing import TYPE_CHECKING
@@ -454,8 +454,7 @@ class CommandProcessor:
                 self.message_handler.agent_manager.update_llm_service(new_llm_service)
 
                 try:
-                    config_manager = ConfigManagement()
-                    config_manager.set_last_used_model(model_id, model.provider)
+                    GlobalConfig().set_last_used_model(model_id, model.provider)
                 except Exception as e:
                     print(f"Warning: Failed to save last used model: {e}")
 
@@ -508,8 +507,7 @@ class CommandProcessor:
                 old_agent.history = []
 
             try:
-                config_manager = ConfigManagement()
-                config_manager.set_last_used_agent(agent_name)
+                GlobalConfig().set_last_used_agent(agent_name)
             except Exception as e:
                 # Don't fail the command if config save fails, just log it
                 print(f"Warning: Failed to save last used agent: {e}")

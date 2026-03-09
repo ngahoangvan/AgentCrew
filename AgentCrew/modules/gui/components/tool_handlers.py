@@ -249,10 +249,9 @@ class ToolEventHandler:
                 f"Approved all future calls to tool: {tool_use['name']}"
             )
         elif clicked_button == forever_button:
-            from AgentCrew.modules.config import ConfigManagement
+            from AgentCrew.modules.config.global_config import GlobalConfig
 
-            config_manager = ConfigManagement()
-            config_manager.write_auto_approval_tools(tool_use["name"], add=True)
+            GlobalConfig().write_auto_approval_tools(tool_use["name"], add=True)
 
             self.chat_window.message_handler.resolve_tool_confirmation(
                 confirmation_id, {"action": "approve_all"}
@@ -424,10 +423,9 @@ class ToolEventHandler:
             )
 
         elif result["action"] == "approve_forever":
-            from AgentCrew.modules.config import ConfigManagement
+            from AgentCrew.modules.config.global_config import GlobalConfig
 
-            config_manager = ConfigManagement()
-            config_manager.write_auto_approval_tools("write_or_edit_file", add=True)
+            GlobalConfig().write_auto_approval_tools("write_or_edit_file", add=True)
 
             self.chat_window.message_handler.resolve_tool_confirmation(
                 confirmation_id, {"action": "approve_all"}

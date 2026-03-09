@@ -1,5 +1,5 @@
 from .theme_loader import ThemeLoader, ThemeData
-from AgentCrew.modules.config import ConfigManagement
+from AgentCrew.modules.config.global_config import GlobalConfig
 from PySide6.QtCore import Signal, QObject
 
 
@@ -20,8 +20,7 @@ class StyleProvider(QObject):
         super().__init__()
         self._initialized = True
 
-        self.config_manager = ConfigManagement()
-        global_config = self.config_manager.read_global_config_data()
+        global_config = GlobalConfig().read()
         self.theme = global_config.get("global_settings", {}).get("theme", "catppuccin")
 
         self._set_theme_class()
@@ -31,7 +30,7 @@ class StyleProvider(QObject):
 
     def update_theme(self, reload=True):
         if reload:
-            global_config = self.config_manager.read_global_config_data()
+            global_config = GlobalConfig().read()
             new_theme = global_config.get("global_settings", {}).get(
                 "theme", "catppuccin"
             )

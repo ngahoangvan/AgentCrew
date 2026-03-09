@@ -2,7 +2,7 @@ from typing import Dict, Any
 import asyncio
 
 from loguru import logger
-from AgentCrew.modules.config import ConfigManagement
+from AgentCrew.modules.config.global_config import GlobalConfig
 
 # from AgentCrew.modules.llm.message import MessageTransformer
 from AgentCrew.modules.agents.base import MessageType
@@ -30,8 +30,7 @@ class ToolManager:
 
     def _load_persistent_auto_approved_tools(self):
         """Load persistent auto-approved tools from config."""
-        config_manager = ConfigManagement()
-        return set(config_manager.get_auto_approval_tools())
+        return set(GlobalConfig().get_auto_approval_tools())
 
     async def execute_tool(self, tool_use: Dict[str, Any]):
         """Execute a tool with proper confirmation flow."""

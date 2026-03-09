@@ -19,6 +19,7 @@ from PySide6.QtCore import Qt, Signal
 from loguru import logger
 
 from AgentCrew.modules.config import ConfigManagement
+from AgentCrew.modules.config.global_config import GlobalConfig
 from typing import List, Optional, Dict, Any
 from AgentCrew.modules.gui.themes import StyleProvider
 
@@ -187,7 +188,7 @@ class CustomLLMProvidersConfigTab(QWidget):
 
     def load_providers(self):
         """Load providers from configuration and populate the list widget."""
-        self.providers_data = self.config_manager.read_custom_llm_providers_config()
+        self.providers_data = GlobalConfig().read_custom_llm_providers_config()
         self.providers_list_widget.clear()
 
         for provider_dict in self.providers_data:
@@ -739,7 +740,7 @@ class CustomLLMProvidersConfigTab(QWidget):
             self.providers_data.append(provider_detail)
 
         try:
-            self.config_manager.write_custom_llm_providers_config(self.providers_data)
+            GlobalConfig().write_custom_llm_providers_config(self.providers_data)
             self.config_changed.emit()
             QMessageBox.information(
                 self, "Success", "Provider configuration saved successfully."
@@ -806,9 +807,7 @@ class CustomLLMProvidersConfigTab(QWidget):
             del self.providers_data[item_index]
 
             try:
-                self.config_manager.write_custom_llm_providers_config(
-                    self.providers_data
-                )
+                GlobalConfig().write_custom_llm_providers_config(self.providers_data)
                 self.config_changed.emit()
                 QMessageBox.information(
                     self, "Success", f"Provider '{provider_name}' removed successfully."

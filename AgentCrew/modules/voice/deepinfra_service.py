@@ -316,10 +316,9 @@ class DeepInfraVoiceService(BaseVoiceService):
         """
 
         try:
-            from AgentCrew.modules.config import ConfigManagement
+            from AgentCrew.modules.config.global_config import GlobalConfig
 
-            config_management = ConfigManagement()
-            global_config = config_management.read_global_config_data()
+            global_config = GlobalConfig().read()
             voice_id = global_config.get("global_settings", {}).get(
                 "voice_id", self.default_voice
             )

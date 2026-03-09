@@ -8,6 +8,7 @@ import click
 import requests
 
 from AgentCrew.modules.config import ConfigManagement
+from AgentCrew.modules.config.global_config import GlobalConfig
 from AgentCrew.modules.llm.model_registry import ModelRegistry
 from AgentCrew.modules.llm.service_manager import ServiceManager
 from AgentCrew.modules.memory.chroma_service import ChromaMemoryService
@@ -93,7 +94,7 @@ class ApplicationSetup:
 
     def detect_provider(self) -> Optional[str]:
         try:
-            last_provider = self.config_manager.get_last_used_provider()
+            last_provider = GlobalConfig().get_last_used_provider()
             if last_provider:
                 if last_provider in PROVIDER_LIST:
                     api_key_map = {
@@ -108,9 +109,7 @@ class ApplicationSetup:
                     if os.getenv(api_key_map.get(last_provider, "")):
                         return last_provider
                 else:
-                    custom_providers = (
-                        self.config_manager.read_custom_llm_providers_config()
-                    )
+                    custom_providers = GlobalConfig().read_custom_llm_providers_config()
                     if any(p["name"] == last_provider for p in custom_providers):
                         return last_provider
         except Exception as e:
@@ -129,7 +128,7 @@ class ApplicationSetup:
         elif os.getenv("DEEPINFRA_API_KEY"):
             return "deepinfra"
         else:
-            custom_providers = self.config_manager.read_custom_llm_providers_config()
+            custom_providers = GlobalConfig().read_custom_llm_providers_config()
             if len(custom_providers) > 0:
                 return custom_providers[0]["name"]
 
@@ -149,8 +148,8 @@ class ApplicationSetup:
         llm_service = llm_manager.get_service(provider)
 
         try:
-            last_model = self.config_manager.get_last_used_model()
-            last_provider = self.config_manager.get_last_used_provider()
+            last_model = GlobalConfig().get_last_used_model()
+            last_provider = GlobalConfig().get_last_used_provider()
 
             if last_model and last_provider:
                 should_restore = False
@@ -266,7 +265,7 @@ class ApplicationSetup:
 
         services["agent_manager"] = self.agent_manager
 
-        global_config = self.config_manager.read_global_config_data()
+        global_config = GlobalConfig().read()
         self.agent_manager.context_shrink_enabled = global_config.get(
             "global_settings", {}
         ).get("auto_context_shrink", True)
@@ -356,7 +355,7 @@ tools = ["memory", "browser", "web_search", "code_analysis"]
     def restore_last_agent(self) -> None:
         initial_agent_selected = False
         try:
-            last_agent = self.config_manager.get_last_used_agent()
+            last_agent = GlobalConfig().get_last_used_agent()
 
             if (
                 last_agent
@@ -455,13 +454,13 @@ tools = ["memory", "browser", "web_search", "code_analysis"]
                     click.echo(f"\u274c Authentication error: {error}", err=True)
                     return False
 
-            global_config = self.config_manager.read_global_config_data()
+            global_config = GlobalConfig().read()
 
             if "api_keys" not in global_config:
                 global_config["api_keys"] = {}
 
             global_config["api_keys"]["GITHUB_COPILOT_API_KEY"] = access_token
-            self.config_manager.write_global_config_data(global_config)
+            GlobalConfig().write(global_config)
 
             click.echo("\U0001f4be GitHub Copilot API key saved to config file!")
             click.echo(

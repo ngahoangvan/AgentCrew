@@ -10,7 +10,6 @@ from AgentCrew.modules.chat.history import ChatHistoryManager
 from AgentCrew.modules.agents import AgentManager
 from AgentCrew.modules.chat.file_handler import FileHandler
 
-from AgentCrew.modules.config import ConfigManagement
 from AgentCrew.modules.memory import (
     BaseMemoryService,
     ContextPersistenceService,
@@ -89,10 +88,9 @@ class MessageHandler(Observable):
                 self.voice_service = DeepInfraVoiceService()
 
     def _yolo_mode_check(self):
-        # This should allows YOLO can be configured on-the-fly without recalled to config too many times
-        config_management = ConfigManagement()
-        global_config = config_management.read_global_config_data()
+        from AgentCrew.modules.config.global_config import GlobalConfig
 
+        global_config = GlobalConfig().read()
         self.tool_manager.yolo_mode = global_config.get("global_settings", {}).get(
             "yolo_mode", False
         )

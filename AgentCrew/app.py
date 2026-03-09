@@ -10,6 +10,7 @@ import click
 
 from AgentCrew.setup import ApplicationSetup, PROVIDER_LIST
 from AgentCrew.modules.config import ConfigManagement
+from AgentCrew.modules.config.global_config import GlobalConfig
 from AgentCrew.modules.llm.service_manager import ServiceManager
 from AgentCrew.modules.agents.local_agent import LocalAgent
 
@@ -94,7 +95,7 @@ class AgentCrewApplication:
             message_handler = MessageHandler(
                 services["memory"], services["context_persistent"], with_voice
             )
-            global_config = self.config_manager.read_global_config_data()
+            global_config = GlobalConfig().read()
 
             ui = ConsoleUI(
                 message_handler,

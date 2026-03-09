@@ -121,11 +121,10 @@ class ServiceManager:
 
     def _load_custom_provider_configs(self):
         """Loads configurations for custom LLM providers."""
-        from AgentCrew.modules.config import ConfigManagement
+        from AgentCrew.modules.config.global_config import GlobalConfig
 
         try:
-            config_manager = ConfigManagement()
-            custom_providers = config_manager.read_custom_llm_providers_config()
+            custom_providers = GlobalConfig().read_custom_llm_providers_config()
             for provider_config in custom_providers:
                 name = provider_config.get("name")
                 # We are interested in 'openai_compatible' type for CustomLLMService
