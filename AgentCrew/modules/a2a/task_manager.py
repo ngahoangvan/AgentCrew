@@ -43,7 +43,7 @@ from .errors import A2AError
 from .task_store import TaskStore
 
 if TYPE_CHECKING:
-    from typing import Any, AsyncIterable, Dict, Optional, Union
+    from typing import Any, AsyncIterable, Dict, List, Optional, Union
     from AgentCrew.modules.agents import AgentManager
     from a2a.types import (
         CancelTaskRequest,
@@ -317,6 +317,15 @@ class AgentTaskManager(TaskManager):
                 except Exception as e:
                     logger.error(f"Error emitting event to {key}: {e}")
 
+    async def _append_history_message(
+        self,
+        context_id: str,
+        message: Dict[str, Any],
+        task_history: List[Dict[str, Any]],
+    ) -> None:
+        await self.store.append_task_history_message(context_id, message)
+        task_history.append(message)
+
     async def _process_agent_task(self, agent: LocalAgent, task: Task):
         """
         Process a task with the agent (background task).
@@ -341,6 +350,8 @@ class AgentTaskManager(TaskManager):
             output_tokens = 0
             retried_count = 0
 
+            task_history = await self.store.get_task_history(task.context_id)
+
             async def _process_task():
                 try:
                     current_response = ""
@@ -355,7 +366,6 @@ class AgentTaskManager(TaskManager):
                         input_tokens += _input_tokens
                         output_tokens += _output_tokens
 
-                    task_history = await self.store.get_task_history(task.context_id)
                     async for (
                         response_message,
                         chunk_text,
@@ -428,8 +438,8 @@ class AgentTaskManager(TaskManager):
                             MessageType.Thinking, {"thinking": thinking_data}
                         )
                         if thinking_message:
-                            await self.store.append_task_history_message(
-                                task.context_id, thinking_message
+                            await self._append_history_message(
+                                task.context_id, thinking_message, task_history
                             )
 
                         assistant_message = agent.format_message(
@@ -442,8 +452,8 @@ class AgentTaskManager(TaskManager):
                             },
                         )
                         if assistant_message:
-                            await self.store.append_task_history_message(
-                                task.context_id, assistant_message
+                            await self._append_history_message(
+                                task.context_id, assistant_message, task_history
                             )
 
                         for tool_use in tool_uses:
@@ -500,8 +510,10 @@ class AgentTaskManager(TaskManager):
                                     {"tool_use": tool_use, "tool_result": tool_result},
                                 )
                                 if tool_result_message:
-                                    await self.store.append_task_history_message(
-                                        task.context_id, tool_result_message
+                                    await self._append_history_message(
+                                        task.context_id,
+                                        tool_result_message,
+                                        task_history,
                                     )
 
                                 await self._record_and_emit_event(
@@ -529,8 +541,10 @@ class AgentTaskManager(TaskManager):
                                         },
                                     )
                                     if tool_result_message:
-                                        await self.store.append_task_history_message(
-                                            task.context_id, tool_result_message
+                                        await self._append_history_message(
+                                            task.context_id,
+                                            tool_result_message,
+                                            task_history,
                                         )
 
                                 except Exception as e:
@@ -543,8 +557,8 @@ class AgentTaskManager(TaskManager):
                                         },
                                     )
                                     if error_message:
-                                        await self.store.append_task_history_message(
-                                            task.context_id, error_message
+                                        await self._append_history_message(
+                                            task.context_id, error_message, task_history
                                         )
 
                         return await _process_task()
@@ -584,7 +598,6 @@ class AgentTaskManager(TaskManager):
                     await self.store.append_task_history_message(
                         task.context_id, assistant_message
                     )
-                task_history = await self.store.get_task_history(task.context_id)
                 user_message = task_history[0].get("content", [{}])[0].get("text", "")
                 if self.memory_service:
                     self.memory_service.store_conversation(
