@@ -1,6 +1,6 @@
 [project]
 name = "agentcrew-ai"
-version = "0.9.6"
+version = "0.10.1"
 requires-python = ">=3.12"
 classifiers = [
   "Programming Language :: Python :: 3",
@@ -20,7 +20,6 @@ dependencies = [
   "click",
   "python-dotenv",
   "anthropic",
-  "pytest",
   "prompt-toolkit>=3.0.52",
   "rich>=13.9.4",
   "pyperclip>=1.9.0",
@@ -63,6 +62,8 @@ nvidia = [
   "torchaudio>=2.8.0",
   "docling>=2.26.0",
 ]
+
+redis = ["redis>=5.0.0"]
 
 [tool.uv]
 conflicts = [[{ extra = "cpu" }, { extra = "nvidia" }]]
@@ -111,4 +112,10 @@ include-package-data = true
 where = ["./"]
 
 [dependency-groups]
-dev = ["pygments>=2.19.1", "pyinstaller>=6.13.0", "langfuse>=3.0.1"]
+dev = [
+  "pygments>=2.19.1",
+  "pyinstaller>=6.13.0",
+  "langfuse>=3.0.1",
+  "pytest>=8.0.0",
+  "pytest-asyncio>=0.24.0",
+]
