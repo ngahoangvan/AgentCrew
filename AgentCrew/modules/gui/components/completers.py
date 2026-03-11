@@ -148,15 +148,41 @@ class GuiCommandCompleter:
         return completions
 
 
+class GuiAtAgentCompleter:
+    """GUI completer for @agent mention."""
+
+    def __init__(self):
+        from AgentCrew.modules.agents import AgentManager
+
+        self.agent_manager = AgentManager.get_instance()
+
+    def get_completions(self, text_to_cursor: str) -> list:
+        at_idx = text_to_cursor.rfind("@")
+        if at_idx == -1:
+            return []
+        word_after_at = text_to_cursor[at_idx + 1 :]
+        if " " in word_after_at:
+            return []
+        return [
+            name
+            for name in self.agent_manager.agents
+            if name.lower().startswith(word_after_at.lower())
+        ]
+
+
 class GuiChatCompleter:
     """Combined GUI completer for chat commands."""
 
     def __init__(self, message_handler=None):
         self.model_completer = GuiModelCompleter()
         self.agent_completer = GuiAgentCompleter()
+        self.at_agent_completer = GuiAtAgentCompleter()
         self.jump_completer = GuiJumpCompleter(message_handler)
         self.mcp_completer = GuiMCPCompleter(message_handler)
         self.command_completer = GuiCommandCompleter()
+
+    def get_at_completions(self, text_to_cursor: str) -> list:
+        return self.at_agent_completer.get_completions(text_to_cursor)
 
     def get_completions(self, text):
         """Get all completions for the given text."""

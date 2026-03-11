@@ -111,6 +111,36 @@ class AgentCompleter(Completer):
                     )
 
 
+class AtAgentCompleter(Completer):
+    """Handles @AgentName completions mid-text."""
+
+    def __init__(self):
+        from AgentCrew.modules.agents import AgentManager
+
+        self.agent_manager = AgentManager.get_instance()
+
+    def get_completions(self, document, complete_event):
+        text_to_cursor = document.text_before_cursor
+        at_idx = text_to_cursor.rfind("@")
+        if at_idx == -1:
+            return
+
+        word_after_at = text_to_cursor[at_idx + 1 :]
+        if " " in word_after_at:
+            return
+
+        for agent_name in self.agent_manager.agents:
+            if agent_name.lower().startswith(word_after_at.lower()):
+                desc = getattr(
+                    self.agent_manager.agents[agent_name], "description", ""
+                )
+                yield Completion(
+                    agent_name,
+                    start_position=-len(word_after_at),
+                    display=f"@{agent_name} — {desc}",
+                )
+
+
 class ChatCompleter(Completer):
     """Combined completer for chat commands."""
 
@@ -118,6 +148,7 @@ class ChatCompleter(Completer):
         self.file_completer = DirectoryListingCompleter()
         self.model_completer = ModelCompleter()
         self.agent_completer = AgentCompleter()
+        self.at_agent_completer = AtAgentCompleter()
         self.jump_completer = JumpCompleter(message_handler)
         self.mcp_completer = MCPCompleter(message_handler)
         self.drop_completer = DropCompleter(message_handler)
@@ -125,6 +156,12 @@ class ChatCompleter(Completer):
 
     def get_completions(self, document, complete_event):
         text = document.text
+
+        text_before = document.text_before_cursor
+        at_idx = text_before.rfind("@")
+        if at_idx != -1 and " " not in text_before[at_idx + 1:] and not text.startswith("/"):
+            yield from self.at_agent_completer.get_completions(document, complete_event)
+            return
 
         if text.startswith("/model "):
             # Use model completer for /model command

@@ -123,6 +123,19 @@ class InputComponents:
             self.insert_command_completion
         )
 
+        # Add @agent mention completer
+        self.chat_window.at_agent_completer = QCompleter(self.chat_window)
+        self.chat_window.at_agent_completer.setCompletionMode(
+            QCompleter.CompletionMode.PopupCompletion
+        )
+        self.chat_window.at_agent_completer.setCaseSensitivity(
+            Qt.CaseSensitivity.CaseInsensitive
+        )
+        self.chat_window.at_agent_completer.setWidget(self.chat_window.message_input)
+        self.chat_window.at_agent_completer.activated.connect(
+            self.insert_at_completion
+        )
+
         self.chat_window.message_input.textChanged.connect(
             self.check_for_path_completion
         )
@@ -133,11 +146,19 @@ class InputComponents:
             self.chat_window.file_completer.popup().hide()
         if self.chat_window.command_completer.popup().isVisible():
             self.chat_window.command_completer.popup().hide()
+        if self.chat_window.at_agent_completer.popup().isVisible():
+            self.chat_window.at_agent_completer.popup().hide()
         text = self.chat_window.message_input.toPlainText()
         cursor_position = self.chat_window.message_input.textCursor().position()
 
-        # Get the text up to the cursor position
         text_to_cursor = text[:cursor_position]
+
+        # Check for @agent mention first (only when actively typing after @)
+        at_idx = text_to_cursor.rfind("@")
+        has_active_at = at_idx != -1 and " " not in text_to_cursor[at_idx + 1:]
+        if has_active_at and not text_to_cursor.startswith("/"):
+            self._check_for_at_completion(text_to_cursor)
+            return
 
         # First check for command completion
         if text_to_cursor.startswith("/") and not text_to_cursor.startswith("/file "):
@@ -270,6 +291,37 @@ class InputComponents:
                     position = text_to_cursor.rfind(word)
             cursor.setPosition(position, QTextCursor.MoveMode.KeepAnchor)
             cursor.insertText(completion)
+
+    def _check_for_at_completion(self, text_to_cursor: str):
+        """Show @agent name completions popup."""
+        completions = self.chat_completer.get_at_completions(text_to_cursor)
+        if completions:
+            model = QStringListModel(completions)
+            self.chat_window.at_agent_completer.setModel(model)
+            popup = self.chat_window.at_agent_completer.popup()
+            popup.setCurrentIndex(
+                self.chat_window.at_agent_completer.completionModel().index(0, 0)
+            )
+            rect = self.chat_window.message_input.cursorRect()
+            rect.setWidth(300)
+            self.chat_window.at_agent_completer.complete(rect)
+        else:
+            self.chat_window.at_agent_completer.popup().hide()
+
+    def insert_at_completion(self, completion: str):
+        """Replace the partial @word with the selected agent name."""
+        cursor = self.chat_window.message_input.textCursor()
+        text = self.chat_window.message_input.toPlainText()
+        position = cursor.position()
+        text_to_cursor = text[:position]
+
+        at_idx = text_to_cursor.rfind("@")
+        if at_idx == -1:
+            return
+
+        cursor.setPosition(at_idx)
+        cursor.setPosition(position, QTextCursor.MoveMode.KeepAnchor)
+        cursor.insertText(f"@{completion}")
 
     @Slot()
     def handle_voice_button_click(self):

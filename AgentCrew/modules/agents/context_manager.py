@@ -149,6 +149,16 @@ Apply matching behaviors from <Adaptive_Behaviors> immediately, overriding defau
 
         adaptive_messages = self.build_adaptive_context()
 
+        if last_user_index == 0:
+            dir_structure = self._get_directory_structure()
+            if dir_structure:
+                adaptive_messages["content"].append(
+                    {
+                        "type": "text",
+                        "text": f"current directory `{os.getcwd()}` has structure:\n{dir_structure}",
+                    }
+                )
+
         if (
             len(final_messages[last_user_index].get("content", [])) > 0
             and final_messages[last_user_index]["content"][0]
@@ -164,7 +174,7 @@ Apply matching behaviors from <Adaptive_Behaviors> immediately, overriding defau
                     adaptive_messages["content"].append(
                         {
                             "type": "text",
-                            "text": f"Our last recent conversations:\n- {'\n - '.join(memory_headers)}\n---\n If this is a new or different topic from our current conversation, call search_memory before responding.",
+                            "text": f"Our last recent conversations:\n- {'\n - '.join(memory_headers)}\n---\n If this is a new or different topic from our current conversation, call search_memory before responding.\n --- End of current context ---\n --- Start user request ---",
                         }
                     )
 
@@ -182,16 +192,6 @@ Apply matching behaviors from <Adaptive_Behaviors> immediately, overriding defau
 Then execute your plan.
 Skip evaluation for: simple one-sentence answers, or when the request matches "when [condition], [action]" — call `learn_behavior` directly instead.""",
                     },
-                )
-
-        if last_user_index == 0:
-            dir_structure = self._get_directory_structure()
-            if dir_structure:
-                adaptive_messages["content"].append(
-                    {
-                        "type": "text",
-                        "text": f"current directory `{os.getcwd()}` has structure:\n{dir_structure}",
-                    }
                 )
 
         if len(adaptive_messages["content"]) > 0:

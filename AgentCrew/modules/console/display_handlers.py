@@ -386,7 +386,12 @@ class DisplayHandlers:
                     transfer_text.append(f"{msg.get('agent', 'unknown')} agent")
                     self.display_message(transfer_text)
                     continue
-
+                elif "<Tag_Action>" in content and "</Tag_Action>" in content:
+                    prefix = "the user request: "
+                    start = content.find(prefix)
+                    end = content.find("</Tag_Action>")
+                    if start != -1 and end != -1:
+                        content = content[start + len(prefix) : end]
                 elif content.startswith("Content of "):
                     continue
                 self.display_user_message(content)

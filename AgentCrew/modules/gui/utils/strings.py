@@ -1,3 +1,13 @@
+def tag_action_strip(data: str) -> str:
+    if "<Tag_Action>" in data and "</Tag_Action>" in data:
+        prefix = "the user request: "
+        start = data.find(prefix)
+        end = data.find("</Tag_Action>")
+        if start != -1 and end != -1:
+            return data[start + len(prefix) : end]
+    return data
+
+
 def agent_evaluation_remove(data: str) -> str:
     if "<agent_evaluation>" in data and "</agent_evaluation>" in data:
         data = (

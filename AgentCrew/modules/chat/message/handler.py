@@ -1,6 +1,7 @@
 from typing import Tuple, Optional, List
 import asyncio
 import os
+import re
 import shlex
 import traceback
 
@@ -19,6 +20,22 @@ from .command_processor import CommandProcessor
 from .tool_manager import ToolManager
 from .conversation import ConversationManager
 from .base import Observable
+
+
+_AT_AGENT_RE = re.compile(r'@([\.\w-]+)')
+
+
+def _resolve_at_mention(user_input: str, agent_manager) -> tuple:
+    match = _AT_AGENT_RE.search(user_input)
+    if match:
+        target = match.group(1)
+        if target in agent_manager.agents:
+            llm_content = (
+                f"<Tag_Action>Transfer to {target} with the user request: "
+                f"{user_input}</Tag_Action>"
+            )
+            return user_input, llm_content
+    return user_input, user_input
 
 
 class MessageHandler(Observable):
@@ -176,18 +193,24 @@ class MessageHandler(Observable):
             )
 
         # Add regular text message
+        display_text, llm_content = _resolve_at_mention(user_input, self.agent_manager)
+
         self._messages_append(
             {
                 "role": "user",
                 "agent": self.agent.name,
-                "content": [{"type": "text", "text": user_input}],
+                "content": [{"type": "text", "text": llm_content}],
             }
         )
         self.current_user_input = self.agent.history[-1]
         self.current_user_input_idx = len(self.streamline_messages) - 1
         self._notify(
             "user_message_created",
-            {"message": self.agent.history[-1], "with_files": False},
+            {
+                "message": self.agent.history[-1],
+                "display_text": display_text,
+                "with_files": False,
+            },
         )
 
         return False, False
