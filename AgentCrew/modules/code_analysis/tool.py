@@ -77,8 +77,8 @@ def get_code_analysis_tool_handler(
 
         exclude_patterns = params.get("exclude_patterns", [])
         result = code_analysis_service.analyze_code_structure(path, exclude_patterns)
-        if isinstance(result, dict) and "error" in result:
-            raise Exception(f"Failed to analyze code: {result['error']}")
+        if isinstance(result, dict):
+            raise Exception(f"Failed to analyze code: {result.get('error', '')}")
 
         project_notes = code_analysis_service.extract_project_notes(result, path)
 

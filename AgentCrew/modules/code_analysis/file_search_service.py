@@ -320,7 +320,7 @@ class FileSearchService:
         relative_paths = []
         for path in paths:
             try:
-                rel_path = os.path.relpath(path, base_dir)
+                rel_path = os.path.join(base_dir, os.path.relpath(path, base_dir))
                 relative_paths.append(rel_path)
             except (ValueError, TypeError) as e:
                 # On Windows, relpath can fail if paths are on different drives
