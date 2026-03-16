@@ -300,6 +300,9 @@ class AgentTaskManager(TaskManager):
                 root=SendStreamingMessageSuccessResponse(id=request.id, result=event)
             )
 
+        if self._is_terminal_state(task.status.state):
+            return
+
         if not self.streaming.is_streaming_enabled(task_id):
             yield SendStreamingMessageResponse(
                 root=JSONRPCErrorResponse(
@@ -309,9 +312,6 @@ class AgentTaskManager(TaskManager):
                     ),
                 )
             )
-            return
-
-        if self._is_terminal_state(task.status.state):
             return
 
         resubscribe_key = f"{task_id}_resub_{request.id}"
