@@ -80,6 +80,8 @@ def get_code_analysis_tool_handler(
         if isinstance(result, dict) and "error" in result:
             raise Exception(f"Failed to analyze code: {result['error']}")
 
+        project_notes = code_analysis_service.extract_project_notes(result, path)
+
         return [
             {
                 "type": "text",
@@ -87,7 +89,7 @@ def get_code_analysis_tool_handler(
             },
             {
                 "type": "text",
-                "text": "Base on the code analysis, learn about the patterns and development flows, adapt project behaviors if possible for better response.",
+                "text": f"===PROJECT NOTES & RULES===\n{project_notes}\n\nUse the above project notes to adapt your project behaviors accordingly. Call learn_behavior with scope 'project' for key patterns you identify.",
             },
         ]
 

@@ -217,12 +217,14 @@ Files to EXCLUDE (generate patterns for these):
 7. Static assets (images, fonts, etc.)
 8. Example/sample files
 
-Files to KEEP (NEVER exclude):
-1. Core application logic (main entry points, core modules)
-2. Business features logic and domain models
-3. API endpoints and controllers
-4. Service/utility classes
-5. Key configuration files that define app structure
+Files to KEEP (NEVER exclude) - ordered by priority:
+1. Shared functions, utilities, and helper modules (e.g., utils/, helpers/, common/, shared/, lib/)
+2. Base classes, abstract classes, and interfaces that other modules inherit from
+3. Core application logic (main entry points, core modules)
+4. Business features logic and domain models
+5. API endpoints and controllers
+6. Service classes and middleware
+7. Key configuration files that define app structure
 
 Here is the complete list of files:
 {chr(10).join(files)}
@@ -278,6 +280,110 @@ Example response format:
             logger.warning(f"Cannot extract exclusion patterns from LLM response: {e}")
 
         return files[:max_files]
+
+    KNOWN_RULE_FILES = [
+        ".cursorrules",
+        "CLAUDE.md",
+        ".github/copilot-instructions.md",
+        "CONVENTIONS.md",
+        ".windsurfrules",
+        "AGENTS.md",
+        ".editorconfig",
+        "CONTRIBUTING.md",
+        ".ai/rules.md",
+    ]
+
+    def extract_project_notes(self, analysis_result: str, repo_path: str) -> str:
+        """Extract project notes, rules, and conventions from the analysis result using LLM.
+
+        Sends the analyzed code structure to the LLM with a prompt to extract
+        project-specific patterns, conventions, and rules. Also checks for
+        known rule/instruction files in the repository.
+
+        Args:
+            analysis_result: The formatted analysis result string from analyze_code_structure
+            repo_path: The root path of the repository being analyzed
+
+        Returns:
+            Structured project notes string for the agent to use as context
+        """
+        if not self.llm_service:
+            return self._fallback_project_notes(repo_path)
+
+        found_rule_files = []
+        for rule_file in self.KNOWN_RULE_FILES:
+            full_path = os.path.join(repo_path, rule_file)
+            if os.path.isfile(full_path):
+                found_rule_files.append(rule_file)
+
+        rule_files_section = ""
+        if found_rule_files:
+            rule_files_section = f"""\n\nIMPORTANT: The following project rule/instruction files were detected in the repository:
+{chr(10).join(f"- {f}" for f in found_rule_files)}
+
+You MUST read these files using the get_file tool to understand project-specific rules and conventions before making any changes."""
+
+        truncated_result = analysis_result
+        max_chars = 30000
+        if len(analysis_result) > max_chars:
+            truncated_result = (
+                analysis_result[:max_chars]
+                + f"\n... (truncated, {len(analysis_result) - max_chars} chars omitted)"
+            )
+
+        prompt = f"""You are analyzing a codebase structure to extract project notes and rules for a development assistant.
+
+Based on the following code structure analysis, extract:
+
+1. **Technology Stack**: Languages, frameworks, key libraries detected
+2. **Architecture Pattern**: How the project is organized (e.g., MVC, modular, monorepo, microservices)
+3. **Naming Conventions**: File naming, module naming, any patterns observed
+4. **Key Entry Points**: Main files, configuration files, app bootstrapping
+5. **Development Patterns**: Dependency injection, service layers, middleware patterns, etc.
+6. **Project-Specific Rules**: Any conventions that a developer MUST follow when working on this codebase (e.g., where to place new files, how modules are registered, import patterns)
+
+Code Structure Analysis:
+{truncated_result}
+
+Return a concise, structured summary in plain text (NOT JSON). Use clear headings and bullet points.
+Focus only on actionable insights that help a developer understand how to work within this codebase.
+Keep it under 500 words."""
+
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+        try:
+            response = loop.run_until_complete(
+                self.llm_service.process_message(prompt, temperature=0)
+            )
+
+            notes = response.strip()
+            if rule_files_section:
+                notes += rule_files_section
+
+            logger.info("Successfully extracted project notes from analysis result")
+            return notes
+        except Exception as e:
+            logger.warning(f"Failed to extract project notes via LLM: {e}")
+            return self._fallback_project_notes(repo_path)
+
+    def _fallback_project_notes(self, repo_path: str) -> str:
+        """Generate minimal project notes when LLM is unavailable."""
+        found_rule_files = []
+        for rule_file in self.KNOWN_RULE_FILES:
+            full_path = os.path.join(repo_path, rule_file)
+            if os.path.isfile(full_path):
+                found_rule_files.append(rule_file)
+
+        notes = "Based on the code analysis, learn about the patterns and development flows, adapt project behaviors if possible for better response."
+        if found_rule_files:
+            notes += "\n\nIMPORTANT: The following project rule/instruction files were detected:\n"
+            notes += chr(10).join(f"- {f}" for f in found_rule_files)
+            notes += "\n\nYou MUST read these files using the get_file tool before making any changes."
+        return notes
 
     def analyze_code_structure(
         self, path: str, exclude_patterns: List[str] = []
