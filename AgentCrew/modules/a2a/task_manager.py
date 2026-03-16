@@ -294,6 +294,12 @@ class AgentTaskManager(TaskManager):
             )
             return
 
+        stored_events = await self.store.get_task_events(task_id)
+        for event in stored_events:
+            yield SendStreamingMessageResponse(
+                root=SendStreamingMessageSuccessResponse(id=request.id, result=event)
+            )
+
         if not self.streaming.is_streaming_enabled(task_id):
             yield SendStreamingMessageResponse(
                 root=JSONRPCErrorResponse(
@@ -304,12 +310,6 @@ class AgentTaskManager(TaskManager):
                 )
             )
             return
-
-        stored_events = await self.store.get_task_events(task_id)
-        for event in stored_events:
-            yield SendStreamingMessageResponse(
-                root=SendStreamingMessageSuccessResponse(id=request.id, result=event)
-            )
 
         if self._is_terminal_state(task.status.state):
             return
