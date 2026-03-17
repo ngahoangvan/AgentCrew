@@ -1,11 +1,14 @@
-from typing import Dict, Any
+from typing import Dict, Any, List
 import asyncio
 
 from loguru import logger
 from AgentCrew.modules.config.global_config import GlobalConfig
 
-# from AgentCrew.modules.llm.message import MessageTransformer
 from AgentCrew.modules.agents.base import MessageType
+from AgentCrew.modules.tools.parallel_executor import (
+    execute_tools_in_parallel,
+    is_sequential_tool,
+)
 
 
 class ToolManager:
@@ -312,6 +315,118 @@ class ToolManager:
             "agent_changed_by_transfer",
             {"tool_use": tool_use, "agent_name": self.message_handler.agent.name},
         )
+
+    async def execute_tools_batch(self, tool_uses: List[Dict[str, Any]]):
+        parallel_buffer = []
+
+        for tool_use in tool_uses:
+            if is_sequential_tool(tool_use["name"]):
+                if parallel_buffer:
+                    await self._execute_parallel_batch(parallel_buffer)
+                    parallel_buffer = []
+                await self.execute_tool(tool_use)
+            else:
+                parallel_buffer.append(tool_use)
+
+        if parallel_buffer:
+            await self._execute_parallel_batch(parallel_buffer)
+
+    async def _execute_parallel_batch(self, tool_uses: List[Dict[str, Any]]):
+        approved = []
+        for tool_use in tool_uses:
+            approval_result = await self._needs_and_gets_approval(tool_use)
+            if approval_result == "denied":
+                continue
+            approved.append(tool_use)
+
+        if not approved:
+            return
+
+        for tool_use in approved:
+            self.message_handler._notify("tool_use", tool_use)
+
+        results = await execute_tools_in_parallel(
+            approved,
+            self.message_handler.agent.execute_tool_call,
+        )
+
+        for r in results:
+            if r.is_error:
+                error_message = self.message_handler.agent.format_message(
+                    MessageType.ToolResult,
+                    {
+                        "tool_use": r.tool_use,
+                        "tool_result": r.result,
+                        "is_error": True,
+                    },
+                )
+                self.message_handler._messages_append(error_message)
+                self.message_handler._notify(
+                    "tool_error",
+                    {
+                        "tool_use": r.tool_use,
+                        "error": r.result,
+                        "message": error_message,
+                    },
+                )
+            else:
+                result_msg = self.message_handler.agent.format_message(
+                    MessageType.ToolResult,
+                    {"tool_use": r.tool_use, "tool_result": r.result},
+                )
+                self.message_handler._messages_append(result_msg)
+                self.message_handler._notify(
+                    "tool_result",
+                    {
+                        "tool_use": r.tool_use,
+                        "tool_result": r.result,
+                        "message": result_msg,
+                    },
+                )
+
+    async def _needs_and_gets_approval(self, tool_use: Dict[str, Any]) -> str:
+        tool_name = tool_use["name"]
+        tool_id = tool_use["id"]
+
+        if self.get_effective_yolo_mode() or tool_name in self._auto_approved_tools:
+            return "approved"
+
+        confirmation = await self._wait_for_tool_confirmation(tool_use)
+        action = confirmation.get("action", "deny")
+
+        if action == "deny":
+            reason = confirmation.get("reason", "")
+            reason_message = (
+                f"Here is the reason: {reason}. Adjust your actions bases on user's reason. Learn new behavior if possible."
+                if reason
+                else "Immediately STOP any tasks or any tool calls and WAIT for user reason and adjustment, learn new behavior if possible."
+            )
+            tool_result = (
+                f"Tool: {tool_id} call has been rejected by user, {reason_message}"
+            )
+            error_message = self.message_handler.agent.format_message(
+                MessageType.ToolResult,
+                {
+                    "tool_use": tool_use,
+                    "tool_result": tool_result,
+                    "is_rejected": True,
+                    "is_error": True,
+                },
+            )
+            self.message_handler._messages_append(error_message)
+            self.message_handler._notify(
+                "tool_denied",
+                {
+                    "tool_use": tool_use,
+                    "message": tool_result,
+                },
+            )
+            return "denied"
+
+        if action == "approve_all":
+            self._auto_approved_tools.add(tool_name)
+
+        return "approved"
 
     def reset_approved_tools(self):
         """Reset approved tools for a new conversation."""

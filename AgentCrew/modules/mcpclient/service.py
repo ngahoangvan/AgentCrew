@@ -8,7 +8,6 @@ from mcp.client.stdio import stdio_client
 from mcp.client.streamable_http import streamable_http_client
 from mcp.client.sse import sse_client
 from AgentCrew.modules.agents import LocalAgent, AgentManager
-from AgentCrew.modules.tools.registry import ToolRegistry
 from .auth import OAuthClientResolver, FileTokenStorage
 import random
 import asyncio
@@ -469,8 +468,7 @@ class MCPService:
                 agent_manager = AgentManager.get_instance()
                 registry = agent_manager.get_local_agent(agent_name)
             else:
-                # Register each tool with the tool registry
-                registry = ToolRegistry.get_instance()
+                registry = None
             for tool in response.tools:
                 # Create namespaced tool definition
                 def tool_definition_factory(tool_info=tool, srv_id=server_name):
@@ -605,8 +603,6 @@ class MCPService:
             Asynchronous handler function for the tool
         """
 
-        # This is the factory that the ToolRegistry expects.
-        # It should return the actual callable that will be invoked by the agent.
         def handler_factory(
             service_instance=None,
         ):  # service_instance will be self (MCPService)

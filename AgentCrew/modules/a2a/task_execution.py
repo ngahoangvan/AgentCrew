@@ -13,6 +13,10 @@ from a2a.types import (
     TaskArtifactUpdateEvent,
 )
 from AgentCrew.modules.agents.base import MessageType
+from AgentCrew.modules.tools.parallel_executor import (
+    execute_tools_in_parallel,
+    is_sequential_tool,
+)
 from .adapters import convert_agent_response_to_a2a_artifact
 from .exceptions import TaskCanceledException
 
@@ -272,41 +276,83 @@ class TaskExecutionEngine:
         tool_uses: List[Dict[str, Any]],
         task_history: List[Dict[str, Any]],
     ) -> None:
+        parallel_buffer: List[Dict[str, Any]] = []
+
         for tool_use in tool_uses:
             if self.cancellation.is_canceled(task.id):
                 raise TaskCanceledException(
                     f"Task {task.id} was canceled during tool execution"
                 )
-            tool_name = tool_use["name"]
 
-            if tool_name == "ask":
-                await self._handle_ask_tool(agent, task, tool_use, task_history)
+            if is_sequential_tool(tool_use["name"]):
+                if parallel_buffer:
+                    await self._flush_parallel(
+                        agent, task, parallel_buffer, task_history
+                    )
+                    parallel_buffer = []
+                await self._execute_single_tool(agent, task, tool_use, task_history)
             else:
-                try:
-                    tool_result = await agent.execute_tool_call(
-                        tool_name, tool_use["input"]
+                parallel_buffer.append(tool_use)
+
+        if parallel_buffer:
+            await self._flush_parallel(agent, task, parallel_buffer, task_history)
+
+    async def _execute_single_tool(
+        self,
+        agent: LocalAgent,
+        task: Task,
+        tool_use: Dict[str, Any],
+        task_history: List[Dict[str, Any]],
+    ) -> None:
+        tool_name = tool_use["name"]
+        if tool_name == "ask":
+            await self._handle_ask_tool(agent, task, tool_use, task_history)
+        else:
+            try:
+                tool_result = await agent.execute_tool_call(
+                    tool_name, tool_use["input"]
+                )
+                tool_result_message = agent.format_message(
+                    MessageType.ToolResult,
+                    {"tool_use": tool_use, "tool_result": tool_result},
+                )
+                if tool_result_message:
+                    await self._append_history_message(
+                        task.context_id, tool_result_message, task_history
                     )
-                    tool_result_message = agent.format_message(
-                        MessageType.ToolResult,
-                        {"tool_use": tool_use, "tool_result": tool_result},
+            except Exception as e:
+                error_message = agent.format_message(
+                    MessageType.ToolResult,
+                    {
+                        "tool_use": tool_use,
+                        "tool_result": str(e),
+                        "is_error": True,
+                    },
+                )
+                if error_message:
+                    await self._append_history_message(
+                        task.context_id, error_message, task_history
                     )
-                    if tool_result_message:
-                        await self._append_history_message(
-                            task.context_id, tool_result_message, task_history
-                        )
-                except Exception as e:
-                    error_message = agent.format_message(
-                        MessageType.ToolResult,
-                        {
-                            "tool_use": tool_use,
-                            "tool_result": str(e),
-                            "is_error": True,
-                        },
-                    )
-                    if error_message:
-                        await self._append_history_message(
-                            task.context_id, error_message, task_history
-                        )
+
+    async def _flush_parallel(
+        self,
+        agent: LocalAgent,
+        task: Task,
+        tool_uses: List[Dict[str, Any]],
+        task_history: List[Dict[str, Any]],
+    ) -> None:
+        results = await execute_tools_in_parallel(tool_uses, agent.execute_tool_call)
+        for r in results:
+            msg = agent.format_message(
+                MessageType.ToolResult,
+                {
+                    "tool_use": r.tool_use,
+                    "tool_result": r.result,
+                    "is_error": r.is_error,
+                },
+            )
+            if msg:
+                await self._append_history_message(task.context_id, msg, task_history)
 
     async def _handle_ask_tool(
         self,

@@ -393,8 +393,7 @@ class MessageHandler(Observable):
                 self._yolo_mode_check()
 
                 # Process each tool use
-                for tool_use in tool_uses:
-                    await self.tool_manager.execute_tool(tool_use)
+                await self.tool_manager.execute_tools_batch(tool_uses)
 
                 self._notify(
                     "update_token_usage",

@@ -2,6 +2,10 @@ from typing import Any, Callable, Dict, List, Optional
 
 from AgentCrew.modules.agents.local_agent import LocalAgent
 from AgentCrew.modules.agents.base import MessageType
+from AgentCrew.modules.tools.parallel_executor import (
+    execute_tools_in_parallel,
+    is_sequential_tool,
+)
 
 
 async def run_agent_loop(
@@ -62,26 +66,68 @@ async def run_agent_loop(
     if assistant_message:
         history.append(assistant_message)
 
-    for tool_use in filtered:
-        try:
-            tool_result = await agent.execute_tool_call(
-                tool_use["name"], tool_use["input"]
-            )
-        except Exception as e:
-            tool_result = str(e)
-            error_msg = agent.format_message(
-                MessageType.ToolResult,
-                {"tool_use": tool_use, "tool_result": tool_result, "is_error": True},
-            )
-            if error_msg:
-                history.append(error_msg)
-            continue
+    parallel_buffer: List[Dict[str, Any]] = []
 
-        result_msg = agent.format_message(
-            MessageType.ToolResult,
-            {"tool_use": tool_use, "tool_result": tool_result},
+    for tool_use in filtered:
+        if is_sequential_tool(tool_use["name"]):
+            if parallel_buffer:
+                results = await execute_tools_in_parallel(
+                    parallel_buffer, agent.execute_tool_call
+                )
+                for r in results:
+                    msg = agent.format_message(
+                        MessageType.ToolResult,
+                        {
+                            "tool_use": r.tool_use,
+                            "tool_result": r.result,
+                            "is_error": r.is_error,
+                        },
+                    )
+                    if msg:
+                        history.append(msg)
+                parallel_buffer = []
+
+            try:
+                tool_result = await agent.execute_tool_call(
+                    tool_use["name"], tool_use["input"]
+                )
+            except Exception as e:
+                tool_result = str(e)
+                error_msg = agent.format_message(
+                    MessageType.ToolResult,
+                    {
+                        "tool_use": tool_use,
+                        "tool_result": tool_result,
+                        "is_error": True,
+                    },
+                )
+                if error_msg:
+                    history.append(error_msg)
+                continue
+
+            result_msg = agent.format_message(
+                MessageType.ToolResult,
+                {"tool_use": tool_use, "tool_result": tool_result},
+            )
+            if result_msg:
+                history.append(result_msg)
+        else:
+            parallel_buffer.append(tool_use)
+
+    if parallel_buffer:
+        results = await execute_tools_in_parallel(
+            parallel_buffer, agent.execute_tool_call
         )
-        if result_msg:
-            history.append(result_msg)
+        for r in results:
+            msg = agent.format_message(
+                MessageType.ToolResult,
+                {
+                    "tool_use": r.tool_use,
+                    "tool_result": r.result,
+                    "is_error": r.is_error,
+                },
+            )
+            if msg:
+                history.append(msg)
 
     return await run_agent_loop(agent, history, tool_filter=tool_filter)
