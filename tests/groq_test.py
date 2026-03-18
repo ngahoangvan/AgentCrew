@@ -59,9 +59,9 @@ def test_explain_content(groq_service):
     assert len(explanation) > 0
 
 
-def test_register_and_execute_tool(groq_service):
+@pytest.mark.asyncio
+async def test_register_and_execute_tool(groq_service):
     """Test tool registration and execution."""
-    # Define a simple test tool
     test_tool = {
         "type": "function",
         "function": {
@@ -77,19 +77,15 @@ def test_register_and_execute_tool(groq_service):
         },
     }
 
-    # Define handler function
-    def test_handler(input):
+    async def test_handler(input):
         return {"result": f"Processed: {input}"}
 
-    # Register tool
     groq_service.register_tool(test_tool, test_handler)
 
-    # Check if tool was registered
     assert len(groq_service.tools) == 1
     assert "test_function" in groq_service.tool_handlers
 
-    # Execute tool
-    result = groq_service.execute_tool("test_function", {"input": "test"})
+    result = await groq_service.execute_tool("test_function", {"input": "test"})
     assert result == {"result": "Processed: test"}
 
 

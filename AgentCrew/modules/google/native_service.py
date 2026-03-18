@@ -91,6 +91,9 @@ class GoogleAINativeService(BaseLLMService):
         self.system_prompt = ""
         logger.info("Initialized Google Service")
 
+    async def close(self):
+        await self.client.close()
+
     def set_think(self, budget_tokens) -> bool:
         """
         Enable or disable thinking mode with the specified token budget.

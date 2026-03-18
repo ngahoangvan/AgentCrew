@@ -30,6 +30,9 @@ class AnthropicService(BaseLLMService):
         self.system_prompt = ""
         logger.info("Initialized Anthropic Service")
 
+    async def close(self):
+        await self.client.close()
+
     def calculate_cost(self, input_tokens: int, output_tokens: int) -> float:
         current_model = ModelRegistry.get_instance().get_model(
             f"{self._provider_name}/{self.model}"

@@ -245,6 +245,10 @@ class BaseLLMService(ABC):
         """
         pass
 
+    async def close(self):
+        """Close the underlying HTTP client and release connections."""
+        pass
+
     async def execute_tool(self, tool_name, tool_params) -> Any:
         """
         Execute a registered tool with the given parameters.

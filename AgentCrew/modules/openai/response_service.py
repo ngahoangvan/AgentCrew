@@ -34,6 +34,9 @@ class OpenAIResponseService(BaseLLMService):
 
         logger.info("Initialized OpenAI Response Service")
 
+    async def close(self):
+        await self.client.close()
+
     def clear_conversation_state(self):
         """Clear conversation state and start fresh."""
         self.conversation_state = {}
