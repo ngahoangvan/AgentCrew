@@ -63,7 +63,6 @@ class TreeSitterChecker:
         ".scala": "scala",
         ".lua": "lua",
         ".r": "r",
-        ".sql": "sql",
         ".html": "html",
         ".css": "css",
         ".json": "json",
