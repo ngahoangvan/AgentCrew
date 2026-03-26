@@ -87,14 +87,20 @@ class OpenAIResponseService(BaseLLMService):
                             "output_text" if role == "assistant" else "input_text"
                         )
                     elif part.get("type") == "image_url":
+                        image_url_value = part.get("image_url", {})
+                        if isinstance(image_url_value, dict):
+                            image_url_value = image_url_value.get("url", "")
                         part["type"] = (
                             "output_image" if role == "assistant" else "input_image"
                         )
+                        part["image_url"] = image_url_value
+                        part.pop("content", None)
             if "tool_calls" in msg:
                 tool_call_list[i] = msg.pop("tool_calls")
             if role == "tool":
                 msg.pop("role", None)
                 msg.pop("tool_name", None)
+                msg.pop("is_rejected", None)
                 msg["type"] = "function_call_output"
                 msg["call_id"] = msg.pop("tool_call_id", None)
                 msg["output"] = json.dumps(msg.pop("content", []))
@@ -283,141 +289,151 @@ class OpenAIResponseService(BaseLLMService):
             event_type = getattr(chunk, "type", None)
 
             if event_type == "response.created":
-                # Response created event - contains response metadata
-                response = getattr(chunk, "response", None)
-                if response:
-                    response_id = getattr(response, "id", None)
-                    if response_id:
-                        logger.debug(
-                            f"Response API: New response created with ID {response_id}"
-                        )
+                pass
 
             elif event_type == "response.in_progress":
-                # Response in progress - no specific action needed
-                logger.debug("Response API: Response in progress")
+                pass
 
             elif event_type == "response.output_item.added":
-                # New output item started (message, reasoning, function call, etc.)
                 item = getattr(chunk, "item", None)
+                output_index = getattr(chunk, "output_index", None)
                 if item:
                     item_type = getattr(item, "type", None)
-                    if item_type == "message":
-                        logger.debug("Response API: New message output started")
-                    elif item_type == "reasoning":
-                        logger.debug("Response API: New reasoning output started")
-                    elif item_type == "function_call":
-                        # Handle tool use
-                        idx = getattr(chunk, "output_index", len(tool_uses) + 1)
-                        while len(tool_uses) < idx:
-                            tool_uses.append({})
+                    if item_type == "function_call":
+                        idx = (
+                            output_index if output_index is not None else len(tool_uses)
+                        )
                         tool_call = {
                             "id": getattr(item, "call_id", ""),
                             "type": "function",
                             "name": getattr(item, "name", ""),
                             "input": {},
+                            "_output_index": idx,
                         }
-                        tool_uses[idx - 1] = tool_call
+                        tool_uses.append(tool_call)
                         logger.debug(
-                            f"Response API: New function call started: {tool_call['name']}"
+                            f"Response API: function_call registered: {tool_call['name']} (output_index={idx})"
                         )
 
             elif event_type == "response.content_part.added":
-                # New content part added to an output item
                 part = getattr(chunk, "part", None)
-                if part:
-                    part_type = getattr(part, "type", None)
-                    if part_type == "output_text":
-                        # Regular text content
-                        text = getattr(part, "text", "")
-                        chunk_text = text
-                        assistant_response += text
-                        logger.debug(
-                            f"Response API: Text content added: {text[:50]}..."
-                        )
+                if part and getattr(part, "type", None) == "output_text":
+                    text = getattr(part, "text", "")
+                    chunk_text = text
+                    assistant_response += text
 
             elif event_type == "response.output_text.delta":
-                # Streaming text delta (incremental text updates)
                 delta = getattr(chunk, "delta", "")
                 if delta:
                     chunk_text = delta
                     assistant_response += delta
-                    logger.debug(f"Response API: Text delta: {delta}")
 
             elif event_type == "response.output_text.done":
-                # Text output completed
                 text = getattr(chunk, "text", "")
                 if text and not assistant_response.endswith(text):
-                    # Sometimes the final text is provided here
                     chunk_text = text
-                    assistant_response = text  # Replace with final complete text
-                logger.debug("Response API: Text output completed")
+                    assistant_response = text
 
             elif event_type == "response.function_call_arguments.delta":
-                # Function call arguments streaming
                 delta = getattr(chunk, "delta", "")
-                tool_index = getattr(chunk, "output_index", len(tool_uses))
-
-                # Find the corresponding tool use and update its arguments
-                if len(tool_uses) >= tool_index:
-                    tool_use = tool_uses[tool_index - 1]
+                tool_index = getattr(chunk, "output_index", None)
+                tool_use = next(
+                    (t for t in tool_uses if t.get("_output_index") == tool_index), None
+                )
+                if tool_use is not None:
                     if "arguments" not in tool_use:
                         tool_use["arguments"] = ""
                     tool_use["arguments"] += delta
-                    logger.debug(
-                        f"Response API: Function arguments delta for {tool_use.get('name')}: {delta}"
+                else:
+                    logger.warning(
+                        f"Response API: no tool found with output_index={tool_index} for arguments delta"
                     )
 
             elif event_type == "response.function_call_arguments.done":
-                # Function call arguments completed
                 arguments = getattr(chunk, "arguments", "")
-                tool_index = getattr(chunk, "output_index", len(tool_uses))
-
-                if len(tool_uses) >= tool_index:
-                    tool_use = tool_uses[tool_index - 1]
-
+                tool_index = getattr(chunk, "output_index", None)
+                tool_use = next(
+                    (t for t in tool_uses if t.get("_output_index") == tool_index), None
+                )
+                if tool_use is not None:
                     try:
                         tool_use["input"] = json.loads(arguments) if arguments else {}
                         tool_use["arguments"] = arguments
-                        logger.debug(
-                            f"Response API: Function arguments completed for {tool_use.get('name')}"
-                        )
                     except json.JSONDecodeError:
                         tool_use["input"] = {}
                         tool_use["arguments"] = arguments
                         logger.warning(
-                            f"Response API: Invalid JSON in function arguments: {arguments}"
+                            f"Response API: invalid JSON arguments for tool output_index={tool_index}"
                         )
+                else:
+                    logger.warning(
+                        f"Response API: no tool found with output_index={tool_index} for arguments done"
+                    )
 
             elif event_type == "response.output_item.done":
-                # Output item completed - may contain usage info
                 item = getattr(chunk, "item", None)
+                output_index = getattr(chunk, "output_index", None)
                 if item:
                     item_type = getattr(item, "type", None)
-                    if item_type == "reasoning":
-                        # Reasoning completed - extract thinking content
+                    if item_type == "function_call":
+                        authoritative_args = getattr(item, "arguments", "")
+                        tool_use = next(
+                            (
+                                t
+                                for t in tool_uses
+                                if t.get("_output_index") == output_index
+                            ),
+                            None,
+                        )
+                        if tool_use is not None:
+                            if not tool_use.get("input") and authoritative_args:
+                                try:
+                                    tool_use["input"] = json.loads(authoritative_args)
+                                    tool_use["arguments"] = authoritative_args
+                                except json.JSONDecodeError:
+                                    logger.warning(
+                                        f"Response API: fallback JSON error for '{tool_use.get('name')}'"
+                                    )
+                        else:
+                            logger.warning(
+                                f"Response API: output_item.done function_call not found output_index={output_index}, registering from item"
+                            )
+                            try:
+                                parsed_input = (
+                                    json.loads(authoritative_args)
+                                    if authoritative_args
+                                    else {}
+                                )
+                            except json.JSONDecodeError:
+                                parsed_input = {}
+                            tool_uses.append(
+                                {
+                                    "id": getattr(item, "call_id", ""),
+                                    "type": "function",
+                                    "name": getattr(item, "name", ""),
+                                    "input": parsed_input,
+                                    "arguments": authoritative_args,
+                                    "_output_index": output_index,
+                                }
+                            )
+                    elif item_type == "reasoning":
                         content = getattr(item, "content", None)
                         if content:
-                            reasoning_content = []
-                            for part in content:
-                                if getattr(part, "type", None) == "output_text":
-                                    reasoning_content.append(getattr(part, "text", ""))
+                            reasoning_content = [
+                                getattr(part, "text", "")
+                                for part in content
+                                if getattr(part, "type", None) == "output_text"
+                            ]
                             if reasoning_content:
                                 thinking_content = ("\n".join(reasoning_content), None)
-                                logger.debug(
-                                    "Response API: Reasoning content extracted"
-                                )
 
             elif event_type == "response.completed":
-                # Entire response completed
                 response = getattr(chunk, "response", None)
                 if response:
-                    # Extract final usage information
                     usage = getattr(response, "usage", None)
                     if usage:
                         input_tokens = getattr(usage, "input_tokens", 0)
                         output_tokens = getattr(usage, "output_tokens", 0)
-
-                        # Handle detailed output tokens if available
                         output_tokens_details = getattr(
                             usage, "output_tokens_details", None
                         )
@@ -427,20 +443,24 @@ class OpenAIResponseService(BaseLLMService):
                             )
                             if reasoning_tokens > 0:
                                 logger.debug(
-                                    f"Response API: Reasoning tokens used: {reasoning_tokens}"
+                                    f"Response API: reasoning_tokens={reasoning_tokens}"
                                 )
-
-                        logger.debug(
-                            f"Response API: Usage - Input: {input_tokens}, Output: {output_tokens}"
+                        logger.info(
+                            f"Response API: input_tokens={input_tokens} output_tokens={output_tokens}"
                         )
 
+                clean_tool_uses = [
+                    {k: v for k, v in t.items() if k != "_output_index"}
+                    for t in tool_uses
+                    if t.get("name")
+                ]
+                tool_uses[:] = clean_tool_uses
+
             else:
-                # Log unhandled event types for debugging
-                logger.debug(f"Response API: Unhandled event type: {event_type}")
+                logger.debug(f"Response API: unhandled event_type={event_type}")
 
         except Exception as e:
-            logger.warning(f"Error processing Response API stream chunk: {e}")
-            # Fallback to basic text extraction if available
+            logger.warning(f"Response API stream chunk error: {e}")
             if hasattr(chunk, "text"):
                 chunk_text = getattr(chunk, "text", "")
                 assistant_response += chunk_text
