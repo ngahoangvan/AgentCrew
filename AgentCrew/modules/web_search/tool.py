@@ -43,7 +43,7 @@ def get_web_search_tool_definition(provider="claude"):
                 "required": tool_required,
             },
         }
-    else:  # provider == "groq"
+    else:  # OpenAI-compatible provider format
         return {
             "type": "function",
             "function": {
@@ -78,7 +78,7 @@ def get_web_extract_tool_definition(provider="claude"):
                 "required": tool_required,
             },
         }
-    else:  # provider == "groq"
+    else:  # OpenAI-compatible provider format
         return {
             "type": "function",
             "function": {

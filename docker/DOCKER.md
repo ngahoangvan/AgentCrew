@@ -98,8 +98,7 @@ Create a `config.json` file:
 {
   "api_keys": {
     "ANTHROPIC_API_KEY": "your_claude_api_key",
-    "OPENAI_API_KEY": "your_openai_api_key",
-    "GROQ_API_KEY": "your_groq_api_key"
+    "OPENAI_API_KEY": "your_openai_api_key"
   }
 }
 ```
@@ -182,7 +181,6 @@ mkdir agentcrew-docker && cd agentcrew-docker
 cat > .env << EOF
 ANTHROPIC_API_KEY=your_claude_api_key
 OPENAI_API_KEY=your_openai_api_key
-GROQ_API_KEY=your_groq_api_key
 EOF
 
 # 3. Create custom agents configuration

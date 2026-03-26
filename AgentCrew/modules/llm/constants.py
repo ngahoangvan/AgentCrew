@@ -191,74 +191,6 @@ _OPENAI_MODELS = [
     ),
 ]
 
-_GROQ_MODELS = [
-    Model(
-        id="compound-beta",
-        provider="groq",
-        name="Agentic Tooling model",
-        description="Groq's first compound models with tooling",
-        capabilities=["thinking"],
-        input_token_price_1m=0.0,
-        output_token_price_1m=0.0,
-    ),
-    Model(
-        id="deepseek-r1-distill-llama-70b",
-        provider="groq",
-        name="DeepSeek R1 Distill",
-        description="DeepSeek's powerful model optimized for Groq",
-        capabilities=["thinking", "tool_use"],
-        input_token_price_1m=0.75,
-        output_token_price_1m=0.99,
-    ),
-    Model(
-        id="llama-3.3-70b-versatile",
-        provider="groq",
-        name="Llama 3.3 70B",
-        description="Meta's Llama 3 70B model optimized for Groq",
-        capabilities=["tool_use"],
-        input_token_price_1m=0.59,
-        output_token_price_1m=0.79,
-    ),
-    Model(
-        id="meta-llama/llama-4-scout-17b-16e-instruct",
-        provider="groq",
-        name="Llama 4 Scout",
-        description="The Llama 4 collection of models are natively multimodal AI models that enable text and multimodal experiences. These models leverage a mixture-of-experts architecture to offer industry-leading performance in text and image understanding.",
-        capabilities=["tool_use", "vision"],
-        input_token_price_1m=0.11,
-        output_token_price_1m=0.34,
-    ),
-    Model(
-        id="meta-llama/llama-4-maverick-17b-128e-instruct",
-        provider="groq",
-        name="Llama 4 Maverick",
-        description="The Llama 4 collection of models are natively multimodal AI models that enable text and multimodal experiences. These models leverage a mixture-of-experts architecture to offer industry-leading performance in text and image understanding.",
-        capabilities=["tool_use"],
-        input_token_price_1m=0.5,
-        output_token_price_1m=0.77,
-    ),
-    Model(
-        id="openai/gpt-oss-120b",
-        provider="groq",
-        name="GPT OSS 120B",
-        description="OpenAI's flagship open-weight MoE model with 120B total parameters",
-        capabilities=["tool_use"],
-        default=False,
-        input_token_price_1m=0.15,
-        output_token_price_1m=0.75,
-    ),
-    Model(
-        id="moonshotai/kimi-k2-instruct",
-        provider="groq",
-        name="Kimi K2 Instruct",
-        description="Kimi K2 is Moonshot AI's state-of-the-art Mixture-of-Experts (MoE) language model with 1 trillion total parameters and 32 billion activated parameters",
-        capabilities=["tool_use", "stream"],
-        default=False,
-        input_token_price_1m=1.0,
-        output_token_price_1m=3.0,
-    ),
-]
-
 _GOOGLE_MODELS = [
     Model(
         id="gemini-2.5-flash-lite",
@@ -768,7 +700,6 @@ _GITHUB_COPILOT_MODELS = [
 AVAILABLE_MODELS = (
     _ANTHROPIC_MODELS
     + _OPENAI_MODELS
-    + _GROQ_MODELS
     + _GOOGLE_MODELS
     + _DEEPINFRA_MODELS
     + _GITHUB_COPILOT_MODELS

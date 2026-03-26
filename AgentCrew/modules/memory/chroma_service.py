@@ -52,7 +52,6 @@ class ChromaMemoryService(BaseMemoryService):
         os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
 
         self.llm_service = llm_service
-        ## set to groq if key available
         if self.llm_service:
             if self.llm_service.provider_name == "google":
                 self.llm_service.model = "gemini-2.5-flash-lite"
@@ -60,8 +59,6 @@ class ChromaMemoryService(BaseMemoryService):
                 self.llm_service.model = "claude-3-5-haiku-latest"
             elif self.llm_service.provider_name == "openai":
                 self.llm_service.model = "gpt-4.1-nano"
-            elif self.llm_service.provider_name == "groq":
-                self.llm_service.model = "llama-3.3-70b-versatile"
             elif self.llm_service.provider_name == "deepinfra":
                 self.llm_service.model = "google/gemma-3-27b-it"
             elif self.llm_service.provider_name == "github_copilot":

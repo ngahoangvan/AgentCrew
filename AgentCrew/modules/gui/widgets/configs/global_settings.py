@@ -59,11 +59,6 @@ class SettingsTab(QWidget):
             "placeholder": "e.g., sk-...",
         },
         {
-            "label": "Groq API Key:",
-            "key_name": "GROQ_API_KEY",
-            "placeholder": "e.g., gsk_...",
-        },
-        {
             "label": "DeepInfra API Key:",
             "key_name": "DEEPINFRA_API_KEY",
             "placeholder": "e.g., ...",

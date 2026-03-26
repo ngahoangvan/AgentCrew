@@ -27,7 +27,6 @@ class ServiceManager:
         # Lazy import factories - only import when called
         self.service_factories: Dict[str, Callable[[], BaseLLMService]] = {
             "claude": self._create_anthropic_service,
-            "groq": self._create_groq_service,
             "openai": self._create_openai_service,
             "google": self._create_google_service,
             "deepinfra": self._create_deepinfra_service,
@@ -47,14 +46,6 @@ class ServiceManager:
 
             return AnthropicService()
         raise RuntimeError("API key for Anthropic not found.")
-
-    def _create_groq_service(self) -> BaseLLMService:
-        """Lazy import and create Groq service."""
-        if os.getenv("GROQ_API_KEY"):
-            from AgentCrew.modules.groq import GroqService
-
-            return GroqService()
-        raise RuntimeError("API key for Groq not found.")
 
     def _create_openai_service(self) -> BaseLLMService:
         """Lazy import and create OpenAI service."""

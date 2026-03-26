@@ -34,7 +34,6 @@ Add your API keys to connect AgentCrew with AI providers:
     "OPENAI_API_KEY": "sk-proj-...",
     "GEMINI_API_KEY": "AIza...",
     "GITHUB_COPILOT_API_KEY": "",
-    "GROQ_API_KEY": "gsk_...",
     "DEEPINFRA_API_KEY": "",
     "TAVILY_API_KEY": "tvly-...",
     "VOYAGE_API_KEY": "pa-...",
@@ -59,7 +58,6 @@ Add your API keys to connect AgentCrew with AI providers:
 - OpenAI: <https://platform.openai.com/api-keys>
 - Google Gemini: <https://aistudio.google.com/apikey>
 - GitHub Copilot: Authenticate using `agentcrew copilot-auth`
-- Groq: <https://console.groq.com/keys>
 - DeepInfra: <https://deepinfra.com/dash/api_keys>
 - Tavily: <https://tavily.com/>
 - Voyage AI: <https://www.voyageai.com/>

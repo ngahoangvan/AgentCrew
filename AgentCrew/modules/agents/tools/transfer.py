@@ -8,7 +8,7 @@ def get_transfer_tool_definition(provider="claude") -> Dict[str, Any]:
     Get the definition for the transfer tool.
 
     Args:
-        provider: The LLM provider (claude, openai, groq)
+        provider: The LLM provider (claude, openai, google)
 
     Returns:
         The tool definition

@@ -62,7 +62,7 @@ def get_generate_image_tool_definition(provider="claude") -> Dict[str, Any]:
                 "required": tool_required,
             },
         }
-    else:  # openai, google, groq format
+    else:  # OpenAI-compatible provider format
         return {
             "type": "function",
             "function": {

@@ -11,7 +11,7 @@ def get_ask_tool_definition(provider="claude") -> Dict[str, Any]:
     Get the definition for the ask tool.
 
     Args:
-        provider: The LLM provider (claude, openai, groq, etc.)
+        provider: The LLM provider (claude, openai, google, etc.)
 
     Returns:
         The tool definition

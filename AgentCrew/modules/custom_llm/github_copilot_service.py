@@ -148,7 +148,7 @@ class GithubCopilotService(CustomLLMService):
                     else:
                         parsed_tool_result = []
                         for tool_content in msg["content"]:
-                            # Skipping vision/image tool results for Groq
+                            # Skipping non-text tool results when vision is unavailable
                             # if res.get("type", "text") == "image_url":
                             #     if "vision" in ModelRegistry.get_model_capabilities(self.model):
                             #         parsed_tool_result.append(res)

@@ -35,7 +35,7 @@ def get_browser_navigate_tool_definition(provider="claude") -> Dict[str, Any]:
                 "required": tool_required,
             },
         }
-    else:  # provider == "groq" or other OpenAI-compatible
+    else:  # OpenAI-compatible provider format
         return {
             "type": "function",
             "function": {
@@ -71,7 +71,7 @@ def get_browser_click_tool_definition(provider="claude") -> Dict[str, Any]:
                 "required": tool_required,
             },
         }
-    else:  # provider == "groq" or other OpenAI-compatible
+    else:  # OpenAI-compatible provider format
         return {
             "type": "function",
             "function": {
@@ -143,7 +143,7 @@ def get_browser_get_content_tool_definition(provider="claude") -> Dict[str, Any]
                 "required": tool_required,
             },
         }
-    else:  # provider == "groq" or other OpenAI-compatible
+    else:  # OpenAI-compatible provider format
         return {
             "type": "function",
             "function": {
@@ -288,7 +288,7 @@ def get_browser_input_tool_definition(provider="claude") -> Dict[str, Any]:
                 "required": tool_required,
             },
         }
-    else:  # provider == "groq" or other OpenAI-compatible
+    else:  # OpenAI-compatible provider format
         return {
             "type": "function",
             "function": {
@@ -432,7 +432,7 @@ def get_browser_capture_screenshot_tool_definition(provider="claude") -> Dict[st
                 "required": tool_required,
             },
         }
-    else:  # provider == "groq" or other OpenAI-compatible
+    else:  # OpenAI-compatible provider format
         return {
             "type": "function",
             "function": {
@@ -572,7 +572,7 @@ def get_browser_send_key_tool_definition(provider="claude") -> Dict[str, Any]:
                 "required": tool_required,
             },
         }
-    else:  # provider == "groq" or other OpenAI-compatible
+    else:  # OpenAI-compatible provider format
         return {
             "type": "function",
             "function": {

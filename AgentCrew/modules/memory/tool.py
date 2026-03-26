@@ -34,7 +34,7 @@ Search for memories need to remote, use date filters to limit scope whenever pos
                 "required": tool_required,
             },
         }
-    else:  # provider == "groq"
+    else:  # OpenAI-compatible provider format
         return {
             "type": "function",
             "function": {
@@ -109,7 +109,7 @@ Use from_date and to_date to filter memories by time whenever posible, Eg: yeste
                 "required": tool_required,
             },
         }
-    else:  # provider == "groq"
+    else:  # OpenAI-compatible provider format
         return {
             "type": "function",
             "function": {
@@ -241,7 +241,7 @@ All behaviors must follow 'when..., [action]...' format for automatic activation
                 "required": tool_required,
             },
         }
-    else:  # provider == "groq"
+    else:  # OpenAI-compatible provider format
         return {
             "type": "function",
             "function": {

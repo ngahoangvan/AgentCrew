@@ -20,7 +20,6 @@ sys.unraisablehook = _custom_unraisable_hook
 
 PROVIDER_LIST = [
     "claude",
-    "groq",
     "openai",
     "google",
     "deepinfra",

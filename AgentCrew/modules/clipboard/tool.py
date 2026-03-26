@@ -7,7 +7,7 @@ def get_clipboard_read_tool_definition(provider="claude") -> Dict[str, Any]:
     Get the tool definition for reading from clipboard based on provider.
 
     Args:
-        provider: The LLM provider ("claude" or "groq")
+        provider: The LLM provider ("claude" or another OpenAI-compatible provider)
 
     Returns:
         Dict containing the tool definition
@@ -25,7 +25,7 @@ def get_clipboard_read_tool_definition(provider="claude") -> Dict[str, Any]:
                 "required": tool_required,
             },
         }
-    else:  # provider == "groq"
+    else:  # OpenAI-compatible provider format
         return {
             "type": "function",
             "function": {
@@ -45,7 +45,7 @@ def get_clipboard_write_tool_definition(provider="claude") -> Dict[str, Any]:
     Get the tool definition for writing to clipboard based on provider.
 
     Args:
-        provider: The LLM provider ("claude" or "groq")
+        provider: The LLM provider ("claude" or another OpenAI-compatible provider)
 
     Returns:
         Dict containing the tool definition
@@ -68,7 +68,7 @@ def get_clipboard_write_tool_definition(provider="claude") -> Dict[str, Any]:
                 "required": tool_required,
             },
         }
-    else:  # provider == "groq"
+    else:  # OpenAI-compatible provider format
         return {
             "type": "function",
             "function": {

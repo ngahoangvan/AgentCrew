@@ -18,7 +18,7 @@ def get_code_analysis_tool_definition(provider="claude") -> Dict[str, Any]:
     Return the tool definition for code analysis based on provider.
 
     Args:
-        provider: The LLM provider ("claude", "groq", or "openai")
+        provider: The LLM provider ("claude", "openai", or another OpenAI-compatible provider)
 
     Returns:
         Dict containing the tool definition
@@ -108,7 +108,7 @@ def get_file_content_tool_definition(provider="claude"):
     Return the tool definition for retrieving file content based on provider.
 
     Args:
-        provider: The LLM provider ("claude", "groq", or "openai")
+        provider: The LLM provider ("claude", "openai", or another OpenAI-compatible provider)
 
     Returns:
         Dict containing the tool definition
@@ -203,7 +203,7 @@ def get_find_files_tool_definition(provider="claude") -> Dict[str, Any]:
 
     Args:
         provider: The LLM provider ("claude" for Claude/Anthropic,
-                 "openai" for OpenAI/Groq)
+                 "openai" for OpenAI-compatible providers)
 
     Returns:
         Dict containing the tool definition in provider-specific format
@@ -270,7 +270,7 @@ def get_find_files_tool_definition(provider="claude") -> Dict[str, Any]:
                 "required": tool_required,
             },
         }
-    else:  # provider == "openai" or "groq"
+    else:  # OpenAI-compatible provider format
         return {
             "type": "function",
             "function": {
@@ -394,7 +394,7 @@ def get_grep_text_tool_definition(provider="claude") -> Dict[str, Any]:
 
     Args:
         provider: The LLM provider ("claude" for Claude/Anthropic,
-                 "openai" for OpenAI/Groq)
+                 "openai" for OpenAI-compatible providers)
 
     Returns:
         Dict containing the tool definition in provider-specific format
@@ -447,7 +447,7 @@ def get_grep_text_tool_definition(provider="claude") -> Dict[str, Any]:
                 "required": tool_required,
             },
         }
-    else:  # provider == "openai" or "groq"
+    else:  # OpenAI-compatible provider format
         return {
             "type": "function",
             "function": {

@@ -33,7 +33,7 @@ what they do best. AgentCrew applies this principle to AI assistants.
 ## Why AgentCrew?
 
 **Multi-Model Flexibility**  
-Switch between Claude, GPT, Gemini, GitHub Copilot, Groq, DeepInfra, or custom
+Switch between Claude, GPT, Gemini, GitHub Copilot, DeepInfra, or custom
 providers without rewriting your setup. Choose the best model for each task or
 budget.
 
@@ -112,7 +112,6 @@ Key details:
 - OpenAI GPT series with native and response modes
 - Google Gemini with native API support
 - GitHub Copilot integration with OAuth flow
-- Groq for fast inference
 - DeepInfra for alternative model hosting
 - Custom OpenAI-compatible providers
 
