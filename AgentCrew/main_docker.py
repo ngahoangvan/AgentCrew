@@ -18,17 +18,6 @@ def _custom_unraisable_hook(unraisable):
 sys.unraisablehook = _custom_unraisable_hook
 
 
-PROVIDER_LIST = [
-    "claude",
-    "openai",
-    "openai_codex",
-    "google",
-    "deepinfra",
-    "github_copilot",
-    "copilot_response",
-]
-
-
 @click.group()
 def cli():
     """Agentcrew - AI Assistant and Agent Framework"""

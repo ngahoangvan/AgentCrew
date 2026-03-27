@@ -83,6 +83,9 @@ class CodeAnalysisService:
                 self.llm_service.model = "gpt-5.1-codex-mini"
             elif self.llm_service.provider_name == "openai_codex":
                 self.llm_service.model = "gpt-5.1-codex-mini"
+            elif self.llm_service.provider_name == "together":
+                self.llm_service.model = "Qwen/Qwen3.5-9B"
+
         try:
             self._tree_sitter_parser_cache = {
                 "python": get_parser("python"),

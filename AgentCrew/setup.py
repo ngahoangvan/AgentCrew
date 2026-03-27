@@ -34,6 +34,7 @@ PROVIDER_LIST = [
     "openai_codex",
     "google",
     "deepinfra",
+    "together",
     "github_copilot",
     "copilot_response",
 ]
@@ -81,6 +82,7 @@ class ApplicationSetup:
             "GEMINI_API_KEY",
             "OPENAI_API_KEY",
             "DEEPINFRA_API_KEY",
+            "TOGETHER_API_KEY",
             "GITHUB_COPILOT_API_KEY",
             "TAVILY_API_KEY",
             "VOYAGE_API_KEY",
@@ -101,6 +103,7 @@ class ApplicationSetup:
                         "google": "GEMINI_API_KEY",
                         "openai": "OPENAI_API_KEY",
                         "deepinfra": "DEEPINFRA_API_KEY",
+                        "together": "TOGETHER_API_KEY",
                         "github_copilot": "GITHUB_COPILOT_API_KEY",
                         "copilot_response": "GITHUB_COPILOT_API_KEY",
                     }
@@ -130,6 +133,8 @@ class ApplicationSetup:
             return "openai"
         elif os.getenv("DEEPINFRA_API_KEY"):
             return "deepinfra"
+        elif os.getenv("TOGETHER_API_KEY"):
+            return "together"
         else:
             custom_providers = GlobalConfig().read_custom_llm_providers_config()
             if len(custom_providers) > 0:

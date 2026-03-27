@@ -457,6 +457,91 @@ _DEEPINFRA_MODELS = [
         output_token_price_1m=0.95,
     ),
 ]
+_TOGETHER_MODELS = [
+    Model(
+        id="zai-org/GLM-5",
+        provider="together",
+        name="GLM 5 FP4",
+        description="General-purpose chat model on Together AI from Z.ai",
+        capabilities=["tool_use", "stream", "structured_output"],
+        default=True,
+        input_token_price_1m=1.0,
+        output_token_price_1m=3.2,
+    ),
+    Model(
+        id="deepseek-ai/DeepSeek-V3.1",
+        provider="together",
+        name="DeepSeek V3.1",
+        description="General-purpose DeepSeek chat model on Together AI",
+        capabilities=["tool_use", "stream", "structured_output"],
+        input_token_price_1m=0.6,
+        output_token_price_1m=1.7,
+    ),
+    Model(
+        id="Qwen/Qwen3.5-397B-A17B",
+        provider="together",
+        name="Qwen 3.5 397B A17B",
+        description="Large general-purpose Qwen chat model on Together AI",
+        capabilities=["tool_use", "stream", "structured_output"],
+        input_token_price_1m=0.6,
+        output_token_price_1m=3.6,
+    ),
+    Model(
+        id="Qwen/Qwen3.5-9B",
+        provider="together",
+        name="Qwen 3.5 9B FP8",
+        description="Small and efficient Qwen chat model on Together AI",
+        capabilities=["tool_use", "stream", "structured_output"],
+        input_token_price_1m=0.1,
+        output_token_price_1m=0.15,
+    ),
+    Model(
+        id="MiniMaxAI/MiniMax-M2.5",
+        provider="together",
+        name="MiniMax M2.5 FP4",
+        description="Efficient MiniMax chat model on Together AI",
+        capabilities=["tool_use", "stream", "structured_output"],
+        input_token_price_1m=0.3,
+        output_token_price_1m=1.2,
+    ),
+    Model(
+        id="moonshotai/Kimi-K2.5",
+        provider="together",
+        name="Kimi K2.5",
+        description="General-purpose Moonshot AI chat model on Together AI",
+        capabilities=["tool_use", "stream", "structured_output"],
+        input_token_price_1m=0.5,
+        output_token_price_1m=2.8,
+    ),
+    Model(
+        id="zai-org/GLM-4.7",
+        provider="together",
+        name="GLM 4.7 FP8",
+        description="General-purpose GLM 4.7 chat model on Together AI",
+        capabilities=["tool_use", "stream", "structured_output"],
+        input_token_price_1m=0.45,
+        output_token_price_1m=2.0,
+    ),
+    Model(
+        id="Qwen/Qwen3-Coder-Next",
+        provider="together",
+        name="Qwen 3 Coder Next FP8",
+        description="Coding-focused Qwen model for development workflows on Together AI",
+        capabilities=["tool_use", "stream", "structured_output"],
+        input_token_price_1m=0.5,
+        output_token_price_1m=1.2,
+    ),
+    Model(
+        id="Qwen/Qwen3-Coder-480B-A35B-Instruct",
+        provider="together",
+        name="Qwen 3 Coder 480B A35B Instruct FP8",
+        description="Flagship coding-focused Qwen instruct model on Together AI",
+        capabilities=["tool_use", "stream", "structured_output"],
+        input_token_price_1m=2.0,
+        output_token_price_1m=2.0,
+    ),
+]
+
 _GITHUB_COPILOT_MODELS = [
     Model(
         id="claude-haiku-4.5",
@@ -764,5 +849,6 @@ AVAILABLE_MODELS = (
     + _OPENAI_CODEX_MODELS
     + _GOOGLE_MODELS
     + _DEEPINFRA_MODELS
+    + _TOGETHER_MODELS
     + _GITHUB_COPILOT_MODELS
 )

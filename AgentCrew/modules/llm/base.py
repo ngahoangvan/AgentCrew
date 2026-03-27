@@ -261,10 +261,10 @@ class BaseLLMService(ABC):
         Returns:
             Any: Result of the tool execution
         """
-        if tool_name not in self.tool_handlers:
+        if tool_name not in getattr(self, "tool_handlers", []):
             raise ValueError(f"Tool '{tool_name}' not found")
 
-        handler = self.tool_handlers[tool_name]
+        handler = getattr(self, "tool_handlers", [])[tool_name]
         return await handler(**tool_params)
 
     @abstractmethod

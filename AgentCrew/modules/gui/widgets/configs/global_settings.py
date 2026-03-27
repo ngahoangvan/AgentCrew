@@ -64,6 +64,11 @@ class SettingsTab(QWidget):
             "placeholder": "e.g., ...",
         },
         {
+            "label": "Together API Key:",
+            "key_name": "TOGETHER_API_KEY",
+            "placeholder": "e.g., ...",
+        },
+        {
             "label": "Github Copilot API Key:",
             "key_name": "GITHUB_COPILOT_API_KEY",
             "placeholder": "e.g., ...",

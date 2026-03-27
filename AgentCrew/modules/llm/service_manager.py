@@ -31,6 +31,7 @@ class ServiceManager:
             "openai_codex": self._create_openai_codex_service,
             "google": self._create_google_service,
             "deepinfra": self._create_deepinfra_service,
+            "together": self._create_together_service,
             "github_copilot": self._create_github_copilot_service,
             "copilot_response": self._create_copilot_response_service,
         }
@@ -77,6 +78,14 @@ class ServiceManager:
 
             return DeepInfraService()
         raise RuntimeError("API key for DeepInfra not found.")
+
+    def _create_together_service(self) -> BaseLLMService:
+        """Lazy import and create Together service."""
+        if os.getenv("TOGETHER_API_KEY"):
+            from AgentCrew.modules.together import TogetherAIService
+
+            return TogetherAIService()
+        raise RuntimeError("API key for Together not found.")
 
     def _create_github_copilot_service(
         self, api_key: Optional[str] = None, provider_name: str = "github_copilot"

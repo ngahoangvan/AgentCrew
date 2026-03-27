@@ -1,0 +1,486 @@
+import json
+import mimetypes
+import os
+from typing import Any, Dict, List, Optional, Tuple
+
+from dotenv import load_dotenv
+from loguru import logger
+from together import AsyncTogether
+
+from AgentCrew.modules.llm.base import BaseLLMService, read_binary_file, read_text_file
+from AgentCrew.modules.llm.model_registry import ModelRegistry
+
+
+class TogetherAIService(BaseLLMService):
+    """Together AI implementation aligned with the official together-py client."""
+
+    def __init__(self, api_key: Optional[str] = None):
+        load_dotenv()
+        self.api_key = api_key or os.getenv("TOGETHER_API_KEY")
+        if not self.api_key:
+            raise ValueError("TOGETHER_API_KEY not found in environment variables")
+        self.base_url = os.getenv("TOGETHER_BASE_URL")
+        self.client = AsyncTogether(api_key=self.api_key)
+        self.model = "deepseek-ai/DeepSeek-V3.1"
+        self.tools = []
+        self.tool_handlers = {}
+        self._provider_name = "together"
+        self.system_prompt = ""
+        self.reasoning_effort = None
+        logger.info("Initialized Together AI Service")
+
+    async def close(self):
+        await self.client.close()
+
+    def set_think(self, budget_tokens) -> bool:
+        if "thinking" in ModelRegistry.get_model_capabilities(
+            f"{self._provider_name}/{self.model}"
+        ):
+            if budget_tokens == "0" or budget_tokens == "none":
+                self.reasoning_effort = None
+                return True
+            self.reasoning_effort = budget_tokens
+            return True
+        logger.info("Thinking mode is not supported for Together models.")
+        return False
+
+    def calculate_cost(self, input_tokens: int, output_tokens: int) -> float:
+        current_model = ModelRegistry.get_instance().get_model(
+            f"{self._provider_name}/{self.model}"
+        )
+        if current_model:
+            input_cost = (input_tokens / 1_000_000) * current_model.input_token_price_1m
+            output_cost = (
+                output_tokens / 1_000_000
+            ) * current_model.output_token_price_1m
+            return input_cost + output_cost
+        return 0.0
+
+    def _convert_internal_format(self, messages: List[Dict[str, Any]]):
+        converted_messages = []
+        for raw_msg in messages:
+            msg = dict(raw_msg)
+            msg.pop("agent", None)
+            if "tool_calls" in msg and msg.get("tool_calls", []):
+                converted_tool_calls = []
+                for raw_tool_call in msg["tool_calls"]:
+                    tool_call = dict(raw_tool_call)
+                    converted_tool_calls.append(
+                        {
+                            "id": tool_call.get("id"),
+                            "type": tool_call.get("type", "function"),
+                            "function": {
+                                "name": tool_call.get("name", ""),
+                                "arguments": json.dumps(tool_call.get("arguments", {})),
+                            },
+                        }
+                    )
+                msg["tool_calls"] = converted_tool_calls
+
+            role = msg.get("role", "")
+            content = msg.get("content", "")
+
+            # Normalize content to string for Together AI compatibility
+            # Together AI doesn't support array content format like OpenAI/Claude
+            if role == "tool":
+                msg.pop("tool_name", None)
+                if isinstance(content, list):
+                    cleaned_content = []
+                    for item in content:
+                        if isinstance(item, dict):
+                            if item.get("type") == "text":
+                                cleaned_content.append(item.get("text", ""))
+                            elif "content" in item:
+                                cleaned_content.append(str(item["content"]))
+                            else:
+                                cleaned_content.append(str(item))
+                        elif item is not None:
+                            cleaned_content.append(str(item))
+                    msg["content"] = "\n".join(c for c in cleaned_content if c)
+                elif not isinstance(content, str):
+                    msg["content"] = str(content) if content is not None else ""
+
+            elif role == "assistant":
+                # Handle assistant message content arrays
+                # Together doesn't support 'thinking' type - convert to text
+                if isinstance(content, list):
+                    cleaned_content = []
+                    for item in content:
+                        if isinstance(item, dict):
+                            if item.get("type") == "thinking":
+                                # Convert thinking blocks to text
+                                thinking_text = (
+                                    item.get("thinking", "") or item.get("text", "")
+                                )
+                                if thinking_text:
+                                    cleaned_content.append(
+                                        f"<thinking>{thinking_text}</thinking>"
+                                    )
+                            elif item.get("type") == "text":
+                                cleaned_content.append(item.get("text", ""))
+                            elif "text" in item:
+                                cleaned_content.append(item["text"])
+                            else:
+                                cleaned_content.append(str(item))
+                        elif item is not None:
+                            cleaned_content.append(str(item))
+                    msg["content"] = "\n".join(c for c in cleaned_content if c)
+                elif not isinstance(content, str):
+                    msg["content"] = str(content) if content is not None else ""
+
+                # Preserve reasoning_content for Together's preserved thinking feature
+                # When using GLM-5 or other reasoning models with preserved thinking,
+                # pass through reasoning_content from previous assistant turns
+                if "reasoning_content" in raw_msg:
+                    msg["reasoning_content"] = raw_msg["reasoning_content"]
+                if "reasoning" in raw_msg:
+                    msg["reasoning"] = raw_msg["reasoning"]
+
+            elif role == "user":
+                # Handle user message content arrays
+                if isinstance(content, list):
+                    cleaned_content = []
+                    for item in content:
+                        if isinstance(item, dict):
+                            if item.get("type") == "text":
+                                cleaned_content.append(item.get("text", ""))
+                            elif "text" in item:
+                                cleaned_content.append(item["text"])
+                            else:
+                                cleaned_content.append(str(item))
+                        elif item is not None:
+                            cleaned_content.append(str(item))
+                    msg["content"] = "\n".join(c for c in cleaned_content if c)
+                elif not isinstance(content, str):
+                    msg["content"] = str(content) if content is not None else ""
+
+            converted_messages.append(msg)
+        return converted_messages
+
+    async def process_message(self, prompt: str, temperature: float = 0) -> str:
+        response = await self.client.chat.completions.create(
+            model=self.model,
+            max_tokens=3000,
+            temperature=temperature,
+            messages=[{"role": "user", "content": prompt}],
+        )
+
+        input_tokens = response.usage.prompt_tokens if response.usage else 0
+        output_tokens = response.usage.completion_tokens if response.usage else 0
+        total_cost = self.calculate_cost(input_tokens, output_tokens)
+
+        logger.info("\nToken Usage Statistics:")
+        logger.info(f"Input tokens: {input_tokens:,}")
+        logger.info(f"Output tokens: {output_tokens:,}")
+        logger.info(f"Total tokens: {input_tokens + output_tokens:,}")
+        logger.info(f"Estimated cost: ${total_cost:.4f}")
+
+        result = (
+            response.choices[0].message.content or ""
+            if response.choices[0].message
+            else ""
+        )
+
+        if "thinking" in ModelRegistry.get_model_capabilities(
+            f"{self._provider_name}/{self.model}"
+        ):
+            think_start = result.find("<think>")
+            think_end = result.find("</think>")
+            if think_start >= 0 and think_end >= 0:
+                result = result[:think_start] + result[think_end + len("</think>") :]
+        return result
+
+    def _process_file(self, file_path: str):
+        mime_type, _ = mimetypes.guess_type(file_path)
+        if mime_type and mime_type.startswith("image/"):
+            if "vision" not in ModelRegistry.get_model_capabilities(
+                f"{self._provider_name}/{self.model}"
+            ):
+                return None
+            image_data = read_binary_file(file_path)
+            if image_data:
+                return {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:{mime_type};base64,{image_data}",
+                        "detail": "high",
+                    },
+                }
+        else:
+            content = read_text_file(file_path)
+            if content:
+                logger.info(f"📄 Including text file: {file_path}")
+                return {
+                    "type": "text",
+                    "text": f"Content of {file_path}:\n\n{content}",
+                }
+        return None
+
+    def process_file_for_message(self, file_path: str) -> Optional[Dict[str, Any]]:
+        return self._process_file(file_path)
+
+    def handle_file_command(self, file_path: str) -> Optional[List[Dict[str, Any]]]:
+        content = self._process_file(file_path)
+        if content:
+            return [content]
+        return None
+
+    def register_tool(self, tool_definition, handler_function):
+        self.tools.append(tool_definition)
+        tool_name = self._extract_tool_name(tool_definition)
+        if not tool_name:
+            raise ValueError("Tool definition must contain a name")
+        self.tool_handlers[tool_name] = handler_function
+        logger.info(f"🔧 Registered tool: {tool_name}")
+
+    async def stream_assistant_response(self, messages: List[Dict[str, Any]]) -> Any:
+        full_model_id = f"{self._provider_name}/{self.model}"
+        stream_params: Dict[str, Any] = {
+            "model": self.model,
+            "messages": self._convert_internal_format(messages),
+            "stream": True,
+            "temperature": self.temperature,
+            "max_tokens": 20000,
+        }
+
+        forced_sample_params = ModelRegistry.get_model_sample_params(full_model_id)
+        if forced_sample_params:
+            if forced_sample_params.temperature is not None:
+                stream_params["temperature"] = forced_sample_params.temperature
+            if forced_sample_params.top_p is not None:
+                stream_params["top_p"] = forced_sample_params.top_p
+            extra_body = stream_params.setdefault("extra_body", {})
+            if forced_sample_params.top_k is not None:
+                extra_body["top_k"] = forced_sample_params.top_k
+            if forced_sample_params.min_p is not None:
+                extra_body["min_p"] = forced_sample_params.min_p
+            if forced_sample_params.repetition_penalty is not None:
+                extra_body["repetition_penalty"] = (
+                    forced_sample_params.repetition_penalty
+                )
+            if forced_sample_params.frequency_penalty is not None:
+                stream_params["frequency_penalty"] = (
+                    forced_sample_params.frequency_penalty
+                )
+            if forced_sample_params.presence_penalty is not None:
+                stream_params["presence_penalty"] = (
+                    forced_sample_params.presence_penalty
+                )
+
+        if self.system_prompt:
+            stream_params["messages"] = [
+                {"role": "system", "content": self.system_prompt}
+            ] + stream_params["messages"]
+
+        if self.tools and "tool_use" in ModelRegistry.get_model_capabilities(
+            full_model_id
+        ):
+            stream_params["tools"] = self.tools
+
+        # Handle reasoning/thinking mode for Together AI models
+        # Different models have different reasoning parameter patterns:
+        # - GPT-OSS models: use reasoning_effort ("low", "medium", "high")
+        # - Hybrid models (DeepSeek V3.1, Kimi K2.5, GLM-5, Qwen3.5): use reasoning={"enabled": True/False}
+        model_caps = ModelRegistry.get_model_capabilities(full_model_id)
+        if "thinking" in model_caps:
+            if self.reasoning_effort:
+                # GPT-OSS style: reasoning_effort parameter
+                if self.reasoning_effort in ["low", "medium", "high"]:
+                    stream_params["reasoning_effort"] = self.reasoning_effort
+                else:
+                    # Hybrid models: reasoning.enabled parameter
+                    stream_params["reasoning"] = {"enabled": True}
+            else:
+                # For hybrid models with thinking on by default, we can disable it
+                # by passing reasoning={"enabled": False}
+                pass
+
+            # For GLM-5 preserved thinking, use chat_template_kwargs
+            # This would be set via reasoning_content in message history
+            # and chat_template_kwargs={"clear_thinking": False}
+
+        if (
+            "structured_output" in ModelRegistry.get_model_capabilities(full_model_id)
+            and self.structured_output
+        ):
+            stream_params["response_format"] = {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "default",
+                    "schema": self.structured_output,
+                },
+            }
+
+        return await self.client.chat.completions.create(**stream_params)
+
+    def process_stream_chunk(
+        self, chunk, assistant_response: str, tool_uses: List[Dict]
+    ) -> Tuple[str, List[Dict], int, int, Optional[str], Optional[tuple]]:
+        chunk_text = None
+        input_tokens = 0
+        output_tokens = 0
+        thinking_content = None
+
+        usage = getattr(chunk, "usage", None)
+        if usage is not None:
+            input_tokens = getattr(usage, "prompt_tokens", 0) or 0
+            output_tokens = getattr(usage, "completion_tokens", 0) or 0
+
+        choices = getattr(chunk, "choices", None)
+        if not choices:
+            return (
+                assistant_response or " ",
+                tool_uses,
+                input_tokens,
+                output_tokens,
+                chunk_text,
+                None,
+            )
+
+        delta = getattr(choices[0], "delta", None)
+        if delta is None:
+            return (
+                assistant_response or " ",
+                tool_uses,
+                input_tokens,
+                output_tokens,
+                chunk_text,
+                None,
+            )
+
+        delta_reasoning = getattr(delta, "reasoning", None)
+        if delta_reasoning:
+            thinking_content = (delta_reasoning, None)
+
+        delta_content = getattr(delta, "content", None)
+        if delta_content:
+            chunk_text = delta_content
+            assistant_response += delta_content
+
+        delta_tool_calls = getattr(delta, "tool_calls", None)
+        if delta_tool_calls:
+            for tool_call_delta in delta_tool_calls:
+                raw_index = getattr(tool_call_delta, "index", len(tool_uses))
+                try:
+                    tool_call_index = int(raw_index)
+                except (TypeError, ValueError):
+                    tool_call_index = len(tool_uses)
+
+                while tool_call_index >= len(tool_uses):
+                    tool_uses.append(
+                        {
+                            "id": None,
+                            "name": "",
+                            "input": {},
+                            "type": "function",
+                            "response": "",
+                        }
+                    )
+
+                current_tool = tool_uses[tool_call_index]
+
+                tool_id = getattr(tool_call_delta, "id", None)
+                if tool_id:
+                    current_tool["id"] = tool_id
+
+                tool_type = getattr(tool_call_delta, "type", None)
+                if tool_type:
+                    current_tool["type"] = tool_type
+
+                function_data = getattr(tool_call_delta, "function", None)
+                if function_data is not None:
+                    function_name = getattr(function_data, "name", None)
+                    if function_name:
+                        current_tool["name"] = function_name
+
+                    function_arguments = getattr(function_data, "arguments", None)
+                    if function_arguments:
+                        current_args = current_tool.get("args_json", "")
+                        current_tool["args_json"] = current_args + function_arguments
+                        try:
+                            current_tool["input"] = json.loads(
+                                current_tool["args_json"]
+                            )
+                        except json.JSONDecodeError:
+                            pass
+
+            if not chunk_text:
+                chunk_text = ""
+
+            return (
+                assistant_response or " ",
+                tool_uses,
+                input_tokens,
+                output_tokens,
+                chunk_text,
+                thinking_content,
+            )
+
+        delta_function_call = getattr(delta, "function_call", None)
+        if delta_function_call is not None:
+            if not tool_uses:
+                tool_uses.append(
+                    {
+                        "id": None,
+                        "name": "",
+                        "input": {},
+                        "type": "function",
+                        "response": "",
+                    }
+                )
+
+            current_tool = tool_uses[-1]
+            function_name = getattr(delta_function_call, "name", None)
+            if function_name:
+                current_tool["name"] = function_name
+
+            function_arguments = getattr(delta_function_call, "arguments", None)
+            if function_arguments:
+                current_args = current_tool.get("args_json", "")
+                current_tool["args_json"] = current_args + function_arguments
+                try:
+                    current_tool["input"] = json.loads(current_tool["args_json"])
+                except json.JSONDecodeError:
+                    pass
+
+            if not chunk_text:
+                chunk_text = ""
+
+        return (
+            assistant_response or " ",
+            tool_uses,
+            input_tokens,
+            output_tokens,
+            chunk_text,
+            thinking_content,
+        )
+
+    async def validate_spec(self, prompt: str) -> str:
+        response = await self.client.chat.completions.create(
+            model=self.model,
+            messages=[{"role": "user", "content": prompt}],
+            response_format={"type": "json_object"},
+        )
+
+        input_tokens = response.usage.prompt_tokens if response.usage else 0
+        output_tokens = response.usage.completion_tokens if response.usage else 0
+        total_cost = self.calculate_cost(input_tokens, output_tokens)
+
+        logger.info("\nSpec Validation Token Usage:")
+        logger.info(f"Input tokens: {input_tokens:,}")
+        logger.info(f"Output tokens: {output_tokens:,}")
+        logger.info(f"Total tokens: {input_tokens + output_tokens:,}")
+        logger.info(f"Estimated cost: ${total_cost:.4f}")
+
+        return (
+            response.choices[0].message.content or ""
+            if response.choices[0].message
+            else ""
+        )
+
+    def set_system_prompt(self, system_prompt: str):
+        self.system_prompt = system_prompt
+
+    def clear_tools(self):
+        self.tools = []
+        self.tool_handlers = {}
