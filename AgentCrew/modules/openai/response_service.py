@@ -272,12 +272,34 @@ class OpenAIResponseService(BaseLLMService):
 
         return await self.client.responses.create(**stream_params)
 
+    @staticmethod
+    def _get_or_create_tool_use(tool_uses: List[Dict], output_index) -> Dict:
+        tool_use = next(
+            (t for t in tool_uses if t.get("_output_index") == output_index), None
+        )
+        if tool_use is None:
+            tool_use = {
+                "id": "",
+                "type": "function",
+                "name": "",
+                "input": {},
+                "arguments": "",
+                "_output_index": output_index,
+                "_saw_args_delta": False,
+            }
+            tool_uses.append(tool_use)
+        return tool_use
+
     def process_stream_chunk(
         self, chunk, assistant_response: str, tool_uses: List[Dict]
     ) -> Tuple[str, List[Dict], int, int, Optional[str], Optional[tuple]]:
         """
         Process a single chunk from Response API streaming.
         Response API uses structured event objects with semantic types.
+
+        All per-stream parsing state lives inside ``tool_uses`` entries
+        (via temporary ``_output_index`` / ``_saw_args_delta`` fields)
+        so that concurrent streams remain isolated.
         """
         chunk_text = None
         input_tokens = 0
@@ -285,7 +307,6 @@ class OpenAIResponseService(BaseLLMService):
         thinking_content = None
 
         try:
-            # Parse the chunk - it's an event object with type and data
             event_type = getattr(chunk, "type", None)
 
             if event_type == "response.created":
@@ -301,18 +322,17 @@ class OpenAIResponseService(BaseLLMService):
                     item_type = getattr(item, "type", None)
                     if item_type == "function_call":
                         idx = (
-                            output_index if output_index is not None else len(tool_uses)
+                            output_index
+                            if output_index is not None
+                            else len(tool_uses)
                         )
-                        tool_call = {
-                            "id": getattr(item, "call_id", ""),
-                            "type": "function",
-                            "name": getattr(item, "name", ""),
-                            "input": {},
-                            "_output_index": idx,
-                        }
-                        tool_uses.append(tool_call)
+                        tool_use = self._get_or_create_tool_use(tool_uses, idx)
+                        if not tool_use["id"]:
+                            tool_use["id"] = getattr(item, "call_id", "")
+                        if not tool_use["name"]:
+                            tool_use["name"] = getattr(item, "name", "")
                         logger.debug(
-                            f"Response API: function_call registered: {tool_call['name']} (output_index={idx})"
+                            f"Response API: function_call registered: {tool_use['name']} (output_index={idx})"
                         )
 
             elif event_type == "response.content_part.added":
@@ -330,45 +350,36 @@ class OpenAIResponseService(BaseLLMService):
 
             elif event_type == "response.output_text.done":
                 text = getattr(chunk, "text", "")
-                if text and not assistant_response.endswith(text):
-                    chunk_text = text
+                if text and not assistant_response:
                     assistant_response = text
+                    chunk_text = text
 
             elif event_type == "response.function_call_arguments.delta":
                 delta = getattr(chunk, "delta", "")
                 tool_index = getattr(chunk, "output_index", None)
-                tool_use = next(
-                    (t for t in tool_uses if t.get("_output_index") == tool_index), None
-                )
-                if tool_use is not None:
-                    if "arguments" not in tool_use:
-                        tool_use["arguments"] = ""
-                    tool_use["arguments"] += delta
-                else:
-                    logger.warning(
-                        f"Response API: no tool found with output_index={tool_index} for arguments delta"
-                    )
+                tool_use = self._get_or_create_tool_use(tool_uses, tool_index)
+                tool_use["arguments"] += delta
+                tool_use["_saw_args_delta"] = True
+                try:
+                    tool_use["input"] = json.loads(tool_use["arguments"])
+                except (json.JSONDecodeError, ValueError):
+                    pass
 
             elif event_type == "response.function_call_arguments.done":
                 arguments = getattr(chunk, "arguments", "")
                 tool_index = getattr(chunk, "output_index", None)
-                tool_use = next(
-                    (t for t in tool_uses if t.get("_output_index") == tool_index), None
-                )
-                if tool_use is not None:
+                tool_use = self._get_or_create_tool_use(tool_uses, tool_index)
+                if not tool_use.get("_saw_args_delta") or not tool_use.get("input"):
+                    tool_use["arguments"] = arguments
                     try:
-                        tool_use["input"] = json.loads(arguments) if arguments else {}
-                        tool_use["arguments"] = arguments
+                        tool_use["input"] = (
+                            json.loads(arguments) if arguments else {}
+                        )
                     except json.JSONDecodeError:
                         tool_use["input"] = {}
-                        tool_use["arguments"] = arguments
                         logger.warning(
                             f"Response API: invalid JSON arguments for tool output_index={tool_index}"
                         )
-                else:
-                    logger.warning(
-                        f"Response API: no tool found with output_index={tool_index} for arguments done"
-                    )
 
             elif event_type == "response.output_item.done":
                 item = getattr(chunk, "item", None)
@@ -376,46 +387,22 @@ class OpenAIResponseService(BaseLLMService):
                 if item:
                     item_type = getattr(item, "type", None)
                     if item_type == "function_call":
-                        authoritative_args = getattr(item, "arguments", "")
-                        tool_use = next(
-                            (
-                                t
-                                for t in tool_uses
-                                if t.get("_output_index") == output_index
-                            ),
-                            None,
+                        tool_use = self._get_or_create_tool_use(
+                            tool_uses, output_index
                         )
-                        if tool_use is not None:
-                            if not tool_use.get("input") and authoritative_args:
-                                try:
-                                    tool_use["input"] = json.loads(authoritative_args)
-                                    tool_use["arguments"] = authoritative_args
-                                except json.JSONDecodeError:
-                                    logger.warning(
-                                        f"Response API: fallback JSON error for '{tool_use.get('name')}'"
-                                    )
-                        else:
-                            logger.warning(
-                                f"Response API: output_item.done function_call not found output_index={output_index}, registering from item"
-                            )
+                        if not tool_use["id"]:
+                            tool_use["id"] = getattr(item, "call_id", "")
+                        if not tool_use["name"]:
+                            tool_use["name"] = getattr(item, "name", "")
+                        authoritative_args = getattr(item, "arguments", "")
+                        if not tool_use.get("input") and authoritative_args:
                             try:
-                                parsed_input = (
-                                    json.loads(authoritative_args)
-                                    if authoritative_args
-                                    else {}
-                                )
+                                tool_use["input"] = json.loads(authoritative_args)
+                                tool_use["arguments"] = authoritative_args
                             except json.JSONDecodeError:
-                                parsed_input = {}
-                            tool_uses.append(
-                                {
-                                    "id": getattr(item, "call_id", ""),
-                                    "type": "function",
-                                    "name": getattr(item, "name", ""),
-                                    "input": parsed_input,
-                                    "arguments": authoritative_args,
-                                    "_output_index": output_index,
-                                }
-                            )
+                                logger.warning(
+                                    f"Response API: fallback JSON error for '{tool_use.get('name')}'"
+                                )
                     elif item_type == "reasoning":
                         content = getattr(item, "content", None)
                         if content:
@@ -449,11 +436,23 @@ class OpenAIResponseService(BaseLLMService):
                             f"Response API: input_tokens={input_tokens} output_tokens={output_tokens}"
                         )
 
-                clean_tool_uses = [
-                    {k: v for k, v in t.items() if k != "_output_index"}
-                    for t in tool_uses
-                    if t.get("name")
-                ]
+                clean_tool_uses = []
+                for t in tool_uses:
+                    if not t.get("name") and not t.get("arguments"):
+                        continue
+                    if not t.get("id"):
+                        t["id"] = str(t.get("_output_index", ""))
+                    if t.get("arguments") and not t.get("input"):
+                        try:
+                            t["input"] = json.loads(t["arguments"])
+                        except (json.JSONDecodeError, ValueError):
+                            pass
+                    clean = {
+                        k: v
+                        for k, v in t.items()
+                        if k not in ("_output_index", "_saw_args_delta")
+                    }
+                    clean_tool_uses.append(clean)
                 tool_uses[:] = clean_tool_uses
 
             else:

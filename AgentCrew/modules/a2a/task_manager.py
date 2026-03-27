@@ -404,7 +404,7 @@ class AgentTaskManager(TaskManager):
         for task_id in task_ids:
             task = await self.store.get_task(task_id)
             if task and self._is_terminal_state(task.status.state):
-                if self._is_expired(task.status.timestamp, retention):
+                if self._is_expired(task.status.timestamp or "", retention):
                     await self.store.cleanup_task(task_id)
                     self.streaming.cleanup(task_id)
 
