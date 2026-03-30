@@ -153,4 +153,8 @@ class FileTaskStore(TaskStore):
             tasks_dir = self.base_dir / "tasks"
             if not tasks_dir.exists():
                 return []
-            return [p.stem for p in tasks_dir.glob("*.json")]
+            return [
+                p.stem
+                for p in tasks_dir.glob("*.json")
+                if not p.stem.endswith("_pending")
+            ]
