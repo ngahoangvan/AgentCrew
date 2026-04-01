@@ -340,17 +340,17 @@ _DEEPINFRA_MODELS = [
         output_token_price_1m=1.6,
     ),
     Model(
-        id="Qwen/Qwen3-Max",
+        id="Qwen/Qwen3.5-397B-A17B",
         provider="deepinfra",
-        name="Qwen 3 Max",
+        name="Qwen 3.5 Big",
         description="Qwen3-Max",
-        capabilities=["tool_use", "stream", "structured_output"],
+        capabilities=["tool_use", "vision", "stream", "structured_output"],
         max_context_token=256_000,
         force_sample_params=SampleParam(
-            temperature=0.7, top_p=0.8, top_k=20, min_p=0.0
+            temperature=0.6, top_p=0.95, top_k=20, min_p=0.0
         ),
-        input_token_price_1m=1.2,
-        output_token_price_1m=6,
+        input_token_price_1m=0.54,
+        output_token_price_1m=3.40,
     ),
     Model(
         id="Qwen/Qwen3-Max-Thinking",
@@ -358,10 +358,12 @@ _DEEPINFRA_MODELS = [
         name="Qwen 3 Max Thinking",
         description="Qwen3 is the latest generation of large language models in Qwen series, offering a comprehensive suite of dense and mixture-of-experts (MoE) models",
         capabilities=["tool_use", "thinking", "stream", "structured_output"],
-        force_sample_params=SampleParam(temperature=0.7, top_p=0.9, top_k=0, min_p=0.0),
+        force_sample_params=SampleParam(
+            temperature=0.6, top_p=0.95, top_k=20, min_p=0.0
+        ),
         max_context_token=256_000,
-        input_token_price_1m=0.2,
-        output_token_price_1m=0.6,
+        input_token_price_1m=1.2,
+        output_token_price_1m=6,
     ),
     Model(
         id="zai-org/GLM-5",
@@ -395,16 +397,16 @@ _DEEPINFRA_MODELS = [
         output_token_price_1m=0.4,
     ),
     Model(
-        id="Qwen/Qwen3-32B",
+        id="Qwen/Qwen3.5-27B",
         provider="deepinfra",
-        name="Qwen 3 32B",
-        description="Qwen3 is the latest generation of large language models in Qwen series, offering a comprehensive suite of dense and mixture-of-experts (MoE) models",
+        name="Qwen 3.5 27B",
+        description="Qwen3.5 is the latest generation of large language models in Qwen series, offering a comprehensive suite of dense and mixture-of-experts (MoE) models",
         capabilities=["tool_use", "stream", "structured_output"],
         force_sample_params=SampleParam(
-            temperature=0.6, top_p=0.95, top_k=20, min_p=0.0
+            temperature=0.7, top_p=0.9, top_k=20, min_p=0.0
         ),
-        input_token_price_1m=0.1,
-        output_token_price_1m=0.3,
+        input_token_price_1m=0.26,
+        output_token_price_1m=2.6,
     ),
     Model(
         id="deepseek-ai/DeepSeek-V3.1-Terminus",
