@@ -159,11 +159,14 @@ Apply matching behaviors from <Adaptive_Behaviors> immediately, overriding defau
                     }
                 )
 
-        if (
-            len(final_messages[last_user_index].get("content", [])) > 0
-            and final_messages[last_user_index]["content"][0]
+        if len(final_messages[last_user_index].get("content", [])) > 0 and (
+            final_messages[last_user_index]["content"][0]
             .get("text", "")
             .find("<Transfer_Tool>")
+            != 0
+            or final_messages[last_user_index]["content"][0]
+            .get("text", "")
+            .find("<Transfer_Post_Action_Reminder>")
             != 0
         ):
             if not agent.is_remoting_mode and agent.services.get("memory"):
