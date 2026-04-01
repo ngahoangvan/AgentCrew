@@ -3,7 +3,7 @@ from AgentCrew.modules.web_search.service import TavilySearchService
 
 def get_web_search_tool_definition(provider="claude"):
     """Return the tool definition for web search based on provider."""
-    tool_description = "Searches the web for up-to-date information on a specific topic or query. Use this to gather current information, verify facts, or explore the latest developments. Summarize your findings *before* presenting them to the user. If the user is seeking information that is likely to have changed recently, this is the tool to use."
+    tool_description = "Searches the web for up-to-date information on a specific topic or query. Prefer this tool for informational research, current facts, documentation lookup, comparisons, and discovering relevant URLs. Summarize your findings *before* presenting them to the user. If the user is seeking information that is likely to have changed recently, this is the tool to use."
     tool_arguments = {
         "query": {
             "type": "string",
@@ -60,7 +60,7 @@ def get_web_search_tool_definition(provider="claude"):
 
 def get_web_extract_tool_definition(provider="claude"):
     """Return the tool definition for web content extraction based on provider."""
-    tool_description = "Retrieves the content from a web page specified by its URL. Use this to access information, documentation, or data available on the web *after* finding the URL using `web_search` or other means. Only use HTTP/HTTPS URLs. DO NOT use this tool to access local project files. Summarize the content of the webpage before presenting it to the user. Prioritize extracting information relevant to the user's current request."
+    tool_description = "Retrieves the content from a web page specified by its URL. Prefer this tool for reading and extracting webpage information when you already have a URL. Only use HTTP/HTTPS URLs. DO NOT use this tool to access local project files. Summarize the content of the webpage before presenting it to the user. Prioritize extracting information relevant to the user's current request."
     tool_arguments = {
         "url": {
             "type": "string",

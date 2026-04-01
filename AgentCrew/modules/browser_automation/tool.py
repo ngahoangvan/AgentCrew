@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 
 def get_browser_navigate_tool_definition(provider="claude") -> Dict[str, Any]:
     """Get tool definition for browser navigation."""
-    tool_description = "Navigate to a URL in the browser. Check result before proceeding with other actions."
+    tool_description = "Navigate to a URL in the browser when you need a live rendered page for interaction, workflow testing, authenticated or session-specific access, JavaScript-rendered content, or inspection of page behavior. Check result before proceeding with other actions."
     tool_arguments = {
         "url": {
             "type": "string",
@@ -52,8 +52,8 @@ def get_browser_navigate_tool_definition(provider="claude") -> Dict[str, Any]:
 
 def get_browser_mouse_action_tool_definition(provider="claude") -> Dict[str, Any]:
     tool_description = (
-        "Perform a mouse action on a browser element using its UUID. "
-        "Use `action=click` to click the target element, or `action=scroll_to` to scroll that element into view. "
+        "Perform a mouse action on a live browser element using its UUID. "
+        "Use this for interaction and workflow testing on the rendered page: `action=click` clicks the target element, and `action=scroll_to` scrolls that element into view. "
         "Always get the `element_uuid` from `get_browser_content` or `get_browser_elements_by_text` first. "
         'Example: `{"action": "click", "element_uuid": "..."}` or `{"action": "scroll_to", "element_uuid": "..."}`.'
     )
@@ -98,7 +98,7 @@ def get_browser_mouse_action_tool_definition(provider="claude") -> Dict[str, Any
 def get_browser_get_content_tool_definition(provider="claude") -> Dict[str, Any]:
     """Get tool definition for browser content extraction."""
     tool_description = (
-        "Extract page content as markdown with tables of clickable, input, and scrollable elements. UUIDs reset on each call."
+        "Extract live rendered page content as markdown with tables of clickable, input, and scrollable elements. Use this after opening a page when you need interactive element discovery, workflow testing, authenticated or session-specific content, or inspection of rendered output. UUIDs reset on each call."
         "get_browser_content tool's result is UNIQUE in whole conversation. Remember to summarize important information before calling again."
     )
     tool_arguments = {}
@@ -230,7 +230,7 @@ def get_browser_mouse_action_tool_handler(
 
 def get_browser_keyboard_action_tool_definition(provider="claude") -> Dict[str, Any]:
     tool_description = (
-        "Perform a keyboard action in the browser. "
+        "Perform a keyboard action in the browser for live-page interaction and workflow testing. "
         "Use `action=input_text` to type text into a specific input element, and use `action=send_key` to send a keyboard key or shortcut to the browser. "
         "Use the `value` field for both actions: for `input_text`, `value` is the text to type; for `send_key`, `value` is the key name such as `enter`, `escape`, `a`, or `f5`. "
         "`element_uuid` is required only for `input_text`. `modifiers` are only used with `send_key`. "
@@ -360,7 +360,7 @@ def get_browser_get_elements_by_text_tool_definition(
     provider="claude",
 ) -> Dict[str, Any]:
     """Get tool definition for browser elements by text search."""
-    tool_description = "Find div elements containing specific text. Returns UUID table for use with other tools."
+    tool_description = "Find div elements containing specific text in the currently rendered browser page. Use this to locate live page elements for interaction, navigation, or testing after loading the page. Returns UUID table for use with other browser tools."
     tool_arguments = {
         "text": {
             "type": "string",
@@ -426,7 +426,7 @@ def get_browser_get_elements_by_text_tool_handler(
 def get_browser_refresh_tool_definition(provider="claude") -> Dict[str, Any]:
     """Get tool definition for browser page refresh."""
     tool_description = (
-        "Refresh/reload the current browser page. Equivalent to pressing F5 or Ctrl+R."
+        "Refresh/reload the current browser page to re-check live rendered state during interaction or testing. Equivalent to pressing F5 or Ctrl+R."
     )
     tool_arguments = {}
     tool_required = []
@@ -496,7 +496,7 @@ def _get_content_delta_changes(browser_service: BrowserAutomationService):
 def get_browser_execute_script_tool_definition(provider="claude") -> Dict[str, Any]:
     tool_description = (
         "Execute JavaScript in the current browser page context using CDP. "
-        "Use for debugging, inspection, or custom DOM queries when built-in tools are insufficient. "
+        "Use this for runtime debugging, rendered DOM inspection, metadata or style extraction, or custom page queries when built-in browser tools are insufficient. "
         "The script body is wrapped in an async IIFE — use `return` to yield a value."
     )
     tool_arguments = {
@@ -575,7 +575,7 @@ def get_browser_execute_script_tool_handler(
 def get_browser_view_console_log_tool_definition(provider="claude") -> Dict[str, Any]:
     tool_description = (
         "View browser console/runtime log entries captured through CDP. "
-        "Includes console.log/warn/error output, JavaScript exceptions, and network errors."
+        "Use this for testing and diagnosing live page behavior, including console.log/warn/error output, JavaScript exceptions, and network errors."
     )
     tool_arguments = {
         "limit": {
@@ -675,7 +675,7 @@ def get_browser_view_console_log_tool_handler(
 def get_browser_element_xpath_tool_definition(provider="claude") -> Dict[str, Any]:
     tool_description = (
         "Get the XPath value for a browser element by its UUID. "
-        "UUIDs are obtained from get_browser_content or get_browser_elements_by_text."
+        "Use this for DOM metadata, selector inspection, or debugging on the live rendered page. UUIDs are obtained from get_browser_content or get_browser_elements_by_text."
     )
     tool_arguments = {
         "element_uuid": {
