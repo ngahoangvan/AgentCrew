@@ -4,62 +4,103 @@
   </a>
 </p>
 
-<h1 align="center">AgentCrew: Multi-Agent AI Framework</h1>
+<h1 align="center">AgentCrew: Your AI Team for Coding and Automation</h1>
+
+<p align="center">
+  Run specialized AI agents for coding, research, documentation, browser tasks,
+  and automation from a GUI, terminal, job runner, or A2A server.
+</p>
 
 [![GitHub stars](https://img.shields.io/github/stars/saigontechnology/AgentCrew)](https://github.com/saigontechnology/AgentCrew/stargazers)
 [![PyPI Downloads](https://static.pepy.tech/personalized-badge/agentcrew-ai?period=total&units=INTERNATIONAL_SYSTEM&left_color=LIGHTGREY&right_color=BRIGHTGREEN&left_text=Downloads)](https://pepy.tech/projects/agentcrew-ai)
 [![Pylint](https://github.com/saigontechnology/AgentCrew/actions/workflows/pylint.yml/badge.svg)](https://github.com/saigontechnology/AgentCrew/actions/workflows/pylint.yml)
 [![CodeQL](https://github.com/saigontechnology/AgentCrew/actions/workflows/codeql.yml/badge.svg)](https://github.com/saigontechnology/AgentCrew/actions/workflows/codeql.yml)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache2.0-yellow.svg)](https://github.com/saigontechnology/AgentCrew/blob/main/LICENSE)
-[![Status: Beta](https://img.shields.io/badge/Status-Beta-blue)](https://github.com/saigontechnology/AgentCrew/releases)
+[![Status: Actively Maintained](https://img.shields.io/badge/status-actively%20maintained-brightgreen)](https://github.com/saigontechnology/AgentCrew/releases)
 [![Python Version](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/release/python-3120/)
 [![Docker](https://img.shields.io/badge/docker-supported-blue.svg)](https://hub.docker.com/r/daltonnyx/agentcrew)
 
+## Why try AgentCrew?
+
+- **Use a team of specialists, not one generic assistant**: create agents for
+  architecture, coding, reviewing, research, writing, QA, or browser work.
+- **Run the same workflow in multiple modes**: use the desktop GUI, terminal,
+  headless jobs, or an A2A-compatible server.
+- **Stay provider-flexible**: work with Claude, OpenAI, Gemini, GitHub Copilot,
+  DeepInfra, or custom OpenAI-compatible providers.
+- **Do real work with tools**: combine MCP, web search, code analysis, file
+  editing, browser automation, memory, and structured outputs.
+- **Keep control**: review tool calls, limit permissions, and choose how much
+  autonomy your agents get.
+
 ## What is AgentCrew?
 
-AgentCrew is a framework for building specialized AI assistant teams. Instead of
-relying on a single AI to handle everything, you create multiple agents where
-each focuses on specific tasks. These agents collaborate by transferring work to specialists
-or delegating tasks to multiple agents in parallel.
+AgentCrew is an AI assistant platform built around **specialized agents that can
+collaborate**.
 
-Think of it like organizing a software team. You don't hire one person to do
-design, backend, frontend, and DevOps. You build a team where experts handle
-what they do best. AgentCrew applies this principle to AI assistants.
+Instead of forcing one assistant to plan, research, code, review, and automate
+everything, AgentCrew lets you define multiple focused agents with their own
+instructions, tools, and behaviors. Those agents can either:
+
+- **transfer** work to a specialist that takes over the conversation, or
+- **delegate** tasks to multiple agents in parallel and merge the results
+
+Think of it like giving yourself an AI architect, coder, reviewer, researcher,
+and operator instead of one overloaded chatbot.
 
 **Demo**
 
 <https://github.com/user-attachments/assets/32876eac-b5e6-4608-bd5e-82d6fa4db80f>
 
-## Why AgentCrew?
+## When AgentCrew shines
 
-**Multi-Model Flexibility**  
-Switch between Claude, GPT, Gemini, GitHub Copilot, DeepInfra, or custom
-providers without rewriting your setup. Choose the best model for each task or
-budget.
+AgentCrew is especially useful when you need more than a simple coding chat:
 
-**Agent Specialization**  
-Create focused agents for research, coding, writing, architecture, or any
-domain. Each agent gets custom instructions, tools, and behavioral rules that
-make them effective at their job.
+- You want separate agents for planning, implementation, review, and docs
+- You need GUI, CLI, automation jobs, and server mode in one tool
+- You want to mix models and providers without changing your workflow
+- You need MCP tools, browser automation, memory, or structured JSON output
+- You want reusable agent configurations that can be shared across projects
 
-**Tool Integration**  
-Connect agents to real-world capabilities through the Model Context Protocol
-(MCP), web search, code analysis, file editing, browser automation, command
-execution, memory systems, and more.
+## Try it in 2 minutes
 
-**Interactive and Automated Modes**  
-Use the GUI or console for interactive conversations. Run headless jobs for
-CI/CD pipelines, automation scripts, or batch processing tasks with structured
-output validation.
+### Quick installation
 
-**Agent-to-Agent Communication**  
-Expose your agents as HTTP services using the A2A protocol. Let agents from
-different AgentCrew instances or external systems collaborate on complex
-workflows.
+**Linux and macOS:**
 
-**Control and Safety**  
-Approve or deny tool usage before execution. Configure permissions, rate limits,
-and access controls. Review what your agents are doing before they do it.
+```bash
+curl -LsSf https://agentcrew.dev/install.sh | bash
+```
+
+**Windows:**
+
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://agentcrew.dev/install.ps1 | iex"
+```
+
+**Docker:**
+
+```bash
+docker pull daltonnyx/agentcrew:latest
+docker run -it --rm -e ANTHROPIC_API_KEY="your_key" daltonnyx/agentcrew chat
+```
+
+### First run
+
+```bash
+# Launch the desktop app
+agentcrew chat
+
+# Or use the terminal interface
+agentcrew chat --console
+```
+
+Configure at least one provider API key, then try prompts like:
+
+- `Create 3 specialized agents for architecture, coding, and code review.`
+- `Review this repository structure and suggest a refactor plan.`
+- `Analyze these files and return a JSON report with risks and recommendations.`
+- `Use browser automation to inspect a page and summarize UX issues.`
 
 ## Core Capabilities
 
@@ -168,34 +209,16 @@ updated anytime.
 - Smart paste detection for images and binary files
 - File attachment support for text, images, PDFs, Office documents
 
-## Getting Started
+## Installation and Authentication
+
+If you already used the quickstart above, you can skip to the usage examples.
+This section is for source installs and provider-specific authentication.
 
 ### Prerequisites
 
 - Python 3.12 or later
 - `uv` package manager: `pip install uv`
 - API keys for at least one AI provider
-
-### Quick Installation
-
-**Linux and macOS:**
-
-```bash
-curl -LsSf https://agentcrew.dev/install.sh | bash
-```
-
-**Windows:**
-
-```powershell
-powershell -ExecutionPolicy ByPass -c "irm https://agentcrew.dev/install.ps1 | iex"
-```
-
-**Docker:**
-
-```bash
-docker pull daltonnyx/agentcrew:latest
-docker run -it --rm -e ANTHROPIC_API_KEY="your_key" daltonnyx/agentcrew chat
-```
 
 ### Standard Installation
 
@@ -206,19 +229,11 @@ uv sync
 uv tool install .
 ```
 
-### First Run
+After installing, launch AgentCrew with either:
 
 ```bash
-# Launch GUI (local installation)
 agentcrew chat
-
-# Launch console interface
 agentcrew chat --console
-
-# Run with Docker
-docker run -it --rm \
-  -e ANTHROPIC_API_KEY="your_key" \
-  daltonnyx/agentcrew chat
 ```
 
 Configure API keys and agents through the Settings menu in the GUI, or edit
@@ -403,7 +418,7 @@ by editing files directly.
 - `config.json` - Global settings, API keys, UI preferences
 - `agents.toml` - Agent definitions, tools, system prompts
 - `mcp_servers.json` - Model Context Protocol server configurations
-- `adaptive_behaviors/` - Per-agent learned behaviors
+- `persistents/` - Saved conversations and learned behaviors
 
 **Quick Configuration via GUI:**
 
@@ -478,25 +493,6 @@ Import agents from files or URLs with conflict resolution strategies.
   - **Skip**: Keep existing agents, ignore imports with same names
   - **Add Only**: Only import agents with unique names
 
-**Community Sharing:**
-
-Share your agent configurations with the community by contributing to
-`examples/agents/`:
-
-```bash
-# Clone repository
-git clone https://github.com/saigontechnology/AgentCrew.git
-cd AgentCrew
-
-# Add your agent config
-cp ~/my_awesome_agent.toml examples/agents/
-
-# Submit pull request
-git add examples/agents/my_awesome_agent.toml
-git commit -m "Add specialized agent for X domain"
-git push origin add-awesome-agent
-```
-
 ## Console Commands
 
 Available in both GUI and console interfaces:
@@ -521,22 +517,23 @@ code.
 
 **Create Custom Tools:**
 
-1. Add module to `AgentCrew/modules/your_tool/`
-2. Define tool in `tool.py` with definition and handler
-3. Register tool in agent configuration
+1. Add a module under `AgentCrew/modules/your_tool/`
+2. Define the tool schema and handler in `tool.py`
+3. Register the tool through the existing registration pattern
+4. expose it through agent configuration
 
 **Add AI Providers:**
 
 - OpenAI-compatible APIs work through custom provider configuration
-- Native providers require implementing `BaseLLMService` interface
+- Native providers should implement the `BaseLLMService` interface
 
-**Share Agent Configurations:**
+**Contribute Safely:**
 
-- Export agents to TOML or JSON
-- Add example configurations to `examples/agents/`
-- Import from files or URLs
+- Follow the existing service, tool, and config patterns
+- Add tests for new behavior where practical
+- Update user-facing docs when workflows change
 
-See `DEVELOPMENT.md` for contribution guidelines and architecture documentation.
+See `CONTRIBUTING.md` for contribution workflow and development guidelines.
 
 ## Security Considerations
 
@@ -565,10 +562,10 @@ usage.
 
 ## Documentation
 
+- `README.md` - Product overview, install, usage modes, and examples
 - `CONFIGURATION.md` - Detailed configuration guide
-- `DEVELOPMENT.md` - Development and contribution guidelines
+- `CONTRIBUTING.md` - Development and contribution guidelines
 - `docker/DOCKER.md` - Docker-specific documentation
-- `examples/agents/` - Example agent configurations
 
 ## Star History
 

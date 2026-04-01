@@ -31,7 +31,7 @@ We welcome various types of contributions:
 1. **Get the code:**
 
    ```bash
-   git clone https://github.com/daltonnyx/AgentCrew.git
+   git clone https://github.com/saigontechnology/AgentCrew.git
    cd AgentCrew
    ```
 

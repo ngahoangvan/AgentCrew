@@ -55,9 +55,9 @@ jobs:
             org.opencontainers.image.title=AgentCrew AI
             org.opencontainers.image.description=Multi-Agents Interactive Chat Tool
             org.opencontainers.image.vendor=AgentCrew
-            org.opencontainers.image.url=https://github.com/daltonnyx/AgentCrew
-            org.opencontainers.image.source=https://github.com/daltonnyx/AgentCrew
-            org.opencontainers.image.documentation=https://github.com/daltonnyx/AgentCrew/blob/main/README.md
+            org.opencontainers.image.url=https://github.com/saigontechnology/AgentCrew
+            org.opencontainers.image.source=https://github.com/saigontechnology/AgentCrew
+            org.opencontainers.image.documentation=https://github.com/saigontechnology/AgentCrew/blob/main/README.md
             org.opencontainers.image.licenses=Apache-2.0
 
       - name: Build and push Docker image

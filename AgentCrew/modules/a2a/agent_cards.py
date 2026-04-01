@@ -100,7 +100,7 @@ def create_agent_card(agent: LocalAgent, base_url: str) -> AgentCard:
     # Create provider info
     provider = AgentProvider(
         organization="AgentCrew",
-        url="https://github.com/daltonnyx/AgentCrew",
+        url="https://github.com/saigontechnology/AgentCrew",
     )
     security_schemes = SecurityScheme(
         root=APIKeySecurityScheme.model_validate(

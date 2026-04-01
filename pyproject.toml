@@ -108,8 +108,8 @@ explicit = true
 
 
 [project.urls]
-"Homepage" = "https://github.com/daltonnyx/AgentCrew"
-"Bug Tracker" = "https://github.com/daltonnyx/AgentCrew/issues"
+"Homepage" = "https://github.com/saigontechnology/AgentCrew"
+"Bug Tracker" = "https://github.com/saigontechnology/AgentCrew/issues"
 
 
 [build-system]
