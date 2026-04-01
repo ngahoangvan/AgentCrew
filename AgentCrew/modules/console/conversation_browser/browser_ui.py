@@ -328,7 +328,7 @@ class ConversationBrowserUI:
     def _get_conversation_preview_messages(
         self, convo_id: str
     ) -> tuple[List[Dict[str, Any]], int]:
-        """Get first 4 user-assistant exchanges for preview.
+        """Get the most recent user-assistant exchanges for preview.
 
         Returns:
             Tuple of (preview_messages, total_filtered_messages)
@@ -372,16 +372,23 @@ class ConversationBrowserUI:
                                 continue
                             all_messages.append({"role": role, "content": text_content})
 
-            preview_messages = []
-            exchanges = 0
+            assistant_indexes = [
+                index
+                for index, msg in enumerate(all_messages)
+                if msg.get("role") == "assistant"
+            ]
             max_exchanges = 4
 
-            for msg in all_messages:
-                preview_messages.append(msg)
-                if msg.get("role") == "assistant":
-                    exchanges += 1
-                    if exchanges >= max_exchanges:
-                        break
+            if len(assistant_indexes) <= max_exchanges:
+                preview_messages = all_messages
+            else:
+                start_index = assistant_indexes[-max_exchanges]
+                if (
+                    start_index > 0
+                    and all_messages[start_index - 1].get("role") == "user"
+                ):
+                    start_index -= 1
+                preview_messages = all_messages[start_index:]
 
             total = len(all_messages)
             result = (preview_messages, total)
@@ -426,11 +433,21 @@ class ConversationBrowserUI:
         preview_lines.append(Text(""))
         preview_lines.append(meta_table)
         preview_lines.append(Text(""))
-        preview_lines.append(Rule(title="Messages", style=RICH_STYLE_GRAY))
+        preview_lines.append(Rule(title="Recent Messages", style=RICH_STYLE_GRAY))
 
         messages, total_messages = self._get_conversation_preview_messages(convo_id)
 
         if messages:
+            remaining = total_messages - len(messages)
+            if remaining > 0:
+                preview_lines.append(Text(""))
+                preview_lines.append(
+                    Text(
+                        f"  \u2026 and {remaining} earlier messages",
+                        style=RICH_STYLE_GRAY,
+                    )
+                )
+
             exchange_count = 0
             i = 0
             while i < len(messages) and exchange_count < 4:
@@ -464,16 +481,6 @@ class ConversationBrowserUI:
                     exchange_count += 1
 
                 i += 1
-
-            remaining = total_messages - len(messages)
-            if remaining > 0:
-                preview_lines.append(Text(""))
-                preview_lines.append(Rule(style=RICH_STYLE_GRAY))
-                preview_lines.append(
-                    Text(
-                        f"  \u2026 and {remaining} more messages", style=RICH_STYLE_GRAY
-                    )
-                )
         else:
             basic_preview = convo.get("preview", "No preview available")
             preview_lines.append(Text(""))
