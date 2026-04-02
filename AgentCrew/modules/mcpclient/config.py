@@ -1,8 +1,18 @@
 import json
 import os
+import time
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 from loguru import logger
+from mcp.shared.auth import OAuthClientInformationFull, OAuthToken
+
+
+@dataclass
+class MCPOAuthOverrideConfig:
+    """Normalized optional OAuth override configuration for an MCP server."""
+
+    tokens: Optional[OAuthToken] = None
+    client_info: Optional[OAuthClientInformationFull] = None
 
 
 @dataclass
@@ -18,6 +28,7 @@ class MCPServerConfig:
     url: str = ""
     headers: Optional[Dict[str, str]] = None
     includeTools: Optional[List[str]] = None
+    oauth: Optional[MCPOAuthOverrideConfig] = None
 
 
 class MCPConfigManager:
@@ -65,6 +76,77 @@ class MCPConfigManager:
 
         return normalized_tools or None
 
+    def _normalize_oauth(
+        self, oauth_config: Any, server_id: str
+    ) -> Optional[MCPOAuthOverrideConfig]:
+        """Normalize the optional MCP OAuth override setting."""
+        if oauth_config is None:
+            return None
+
+        if not isinstance(oauth_config, dict):
+            logger.warning(
+                f"Invalid oauth override for MCP server '{server_id}': expected an object, got {type(oauth_config).__name__}. Ignoring override."
+            )
+            return None
+
+        tokens_override: Optional[OAuthToken] = None
+        client_info_override: Optional[OAuthClientInformationFull] = None
+
+        raw_tokens = oauth_config.get("tokens")
+        if raw_tokens is not None:
+            if not isinstance(raw_tokens, dict):
+                logger.warning(
+                    f"Invalid oauth.tokens for MCP server '{server_id}': expected an object, got {type(raw_tokens).__name__}. Ignoring tokens override."
+                )
+            else:
+                normalized_tokens = dict(raw_tokens)
+                expires_at = normalized_tokens.get("expires_at")
+                if (
+                    expires_at is not None
+                    and normalized_tokens.get("expires_in") is None
+                ):
+                    try:
+                        expires_at_value = float(expires_at)
+                        now_ms = time.time() * 1000
+                        remaining_seconds = max(
+                            0, int((expires_at_value - now_ms + 999) // 1000)
+                        )
+                        normalized_tokens["expires_in"] = remaining_seconds
+                    except (TypeError, ValueError):
+                        logger.warning(
+                            f"Invalid oauth.tokens.expires_at for MCP server '{server_id}'. Ignoring expires_at value."
+                        )
+                try:
+                    tokens_override = OAuthToken.model_validate(normalized_tokens)
+                except Exception as exc:
+                    logger.warning(
+                        f"Invalid oauth.tokens for MCP server '{server_id}'. Ignoring tokens override: {exc}"
+                    )
+
+        raw_client_info = oauth_config.get("client_info")
+        if raw_client_info is not None:
+            if not isinstance(raw_client_info, dict):
+                logger.warning(
+                    f"Invalid oauth.client_info for MCP server '{server_id}': expected an object, got {type(raw_client_info).__name__}. Ignoring client info override."
+                )
+            else:
+                try:
+                    client_info_override = OAuthClientInformationFull.model_validate(
+                        raw_client_info
+                    )
+                except Exception as exc:
+                    logger.warning(
+                        f"Invalid oauth.client_info for MCP server '{server_id}'. Ignoring client info override: {exc}"
+                    )
+
+        if not tokens_override and not client_info_override:
+            return None
+
+        return MCPOAuthOverrideConfig(
+            tokens=tokens_override,
+            client_info=client_info_override,
+        )
+
     def load_config(self) -> Dict[str, MCPServerConfig]:
         """
         Load server configurations from the config file.
@@ -98,6 +180,7 @@ class MCPConfigManager:
                     includeTools=self._normalize_include_tools(
                         config.get("includeTools"), server_id
                     ),
+                    oauth=self._normalize_oauth(config.get("oauth"), server_id),
                 )
 
             return self.configs

@@ -96,13 +96,13 @@ class FileTokenStorage(TokenStorage):
 
             # Load tokens if present
             if "tokens" in data and data["tokens"]:
-                self._tokens = OAuthToken.model_validate_json(data["tokens"])
+                self._tokens = OAuthToken.model_validate(data["tokens"])
             else:
                 self._tokens = None
 
             # Load client info if present
             if "client_info" in data and data["client_info"]:
-                self._client_info = OAuthClientInformationFull.model_validate_json(
+                self._client_info = OAuthClientInformationFull.model_validate(
                     data["client_info"]
                 )
             else:
@@ -123,8 +123,8 @@ class FileTokenStorage(TokenStorage):
         """Save tokens and client info to file."""
         try:
             data = {
-                "tokens": self._tokens.model_dump_json() if self._tokens else None,
-                "client_info": self._client_info.model_dump_json()
+                "tokens": self._tokens.model_dump() if self._tokens else None,
+                "client_info": self._client_info.model_dump()
                 if self._client_info
                 else None,
             }
@@ -141,6 +141,38 @@ class FileTokenStorage(TokenStorage):
         except Exception as e:
             logger.error(f"Failed to save tokens to {self.token_file}: {e}")
             raise
+
+
+class InlineTokenStorage(TokenStorage):
+    """Token storage wrapper that applies config-provided OAuth overrides at runtime."""
+
+    def __init__(
+        self,
+        base_storage: TokenStorage,
+        tokens_override: Optional[OAuthToken] = None,
+        client_info_override: Optional[OAuthClientInformationFull] = None,
+    ):
+        self.base_storage = base_storage
+        self._runtime_tokens = tokens_override
+        self._runtime_client_info = client_info_override
+
+    async def get_tokens(self) -> OAuthToken | None:
+        if self._runtime_tokens is not None:
+            return self._runtime_tokens
+        return await self.base_storage.get_tokens()
+
+    async def set_tokens(self, tokens: OAuthToken) -> None:
+        self._runtime_tokens = tokens
+        await self.base_storage.set_tokens(tokens)
+
+    async def get_client_info(self) -> OAuthClientInformationFull | None:
+        if self._runtime_client_info is not None:
+            return self._runtime_client_info
+        return await self.base_storage.get_client_info()
+
+    async def set_client_info(self, client_info: OAuthClientInformationFull) -> None:
+        self._runtime_client_info = client_info
+        await self.base_storage.set_client_info(client_info)
 
 
 class OAuthCallbackServer:

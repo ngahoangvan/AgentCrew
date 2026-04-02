@@ -8,7 +8,7 @@ from mcp.client.stdio import stdio_client
 from mcp.client.streamable_http import streamable_http_client
 from mcp.client.sse import sse_client
 from AgentCrew.modules.agents import LocalAgent, AgentManager
-from .auth import OAuthClientResolver, FileTokenStorage
+from .auth import OAuthClientResolver, FileTokenStorage, InlineTokenStorage
 import random
 import asyncio
 import threading
@@ -64,8 +64,7 @@ class MCPService:
                 headers = server_config.headers if server_config.headers else {}
 
                 # Backward compatible with SSE
-                # Get or create token storage for this specific server
-                token_storage = self._get_or_create_token_storage(server_name)
+                token_storage = self._build_token_storage(server_config)
                 client_info = await token_storage.get_client_info()
                 if client_info and client_info.redirect_uris:
                     port = client_info.redirect_uris[0].port
@@ -338,6 +337,19 @@ class MCPService:
                 f"MCPService: Created new FileTokenStorage for server '{server_name}'"
             )
         return self.tokens_storage_cache[server_name]
+
+    def _build_token_storage(self, server_config: MCPServerConfig):
+        """Build effective token storage using cached file storage plus optional config overrides."""
+        base_storage = self._get_or_create_token_storage(server_config.name)
+        oauth_override = getattr(server_config, "oauth", None)
+        if not oauth_override:
+            return base_storage
+
+        return InlineTokenStorage(
+            base_storage=base_storage,
+            tokens_override=oauth_override.tokens,
+            client_info_override=oauth_override.client_info,
+        )
 
     async def start_server_connection_management(
         self, server_config: MCPServerConfig, agent_name: Optional[str] = None

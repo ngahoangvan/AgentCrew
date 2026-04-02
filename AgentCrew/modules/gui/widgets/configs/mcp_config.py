@@ -343,9 +343,7 @@ class MCPsConfigTab(QWidget):
         self.url_input.setText(server_config.get("url", ""))
         self.command_input.setText(server_config.get("command", ""))
         self.include_tools_input.setText(
-            ", ".join(
-                self._normalize_include_tools(server_config.get("includeTools"))
-            )
+            ", ".join(self._normalize_include_tools(server_config.get("includeTools")))
         )
 
         # Clear existing argument fields

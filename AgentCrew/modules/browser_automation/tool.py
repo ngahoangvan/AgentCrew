@@ -425,9 +425,7 @@ def get_browser_get_elements_by_text_tool_handler(
 
 def get_browser_refresh_tool_definition(provider="claude") -> Dict[str, Any]:
     """Get tool definition for browser page refresh."""
-    tool_description = (
-        "Refresh/reload the current browser page to re-check live rendered state during interaction or testing. Equivalent to pressing F5 or Ctrl+R."
-    )
+    tool_description = "Refresh/reload the current browser page to re-check live rendered state during interaction or testing. Equivalent to pressing F5 or Ctrl+R."
     tool_arguments = {}
     tool_required = []
 
