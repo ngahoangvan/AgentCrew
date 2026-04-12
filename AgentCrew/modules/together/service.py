@@ -198,7 +198,10 @@ class TogetherAIService(BaseLLMService):
             think_start = result_text.find("<think>")
             think_end = result_text.find("</think>")
             if think_start >= 0 and think_end >= 0:
-                result_text = result_text[:think_start] + result_text[think_end + len("</think>"):]
+                result_text = (
+                    result_text[:think_start]
+                    + result_text[think_end + len("</think>") :]
+                )
         return result_text
 
     def _process_file(self, file_path: str):

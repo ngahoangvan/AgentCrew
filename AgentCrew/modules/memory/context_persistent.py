@@ -18,6 +18,7 @@ class ContextPersistenceService:
 
     CONVERSATIONS_SUBDIR = "conversations"
     ADAPTIVE_BEHAVIORS_FILE = "adaptive.json"
+    PROMPT_EVOLUTIONS_FILE = "prompt_evolutions.json"
 
     def __init__(self, persistence_dir_override: Optional[str] = None):
         """
@@ -54,6 +55,9 @@ class ContextPersistenceService:
         )
         self.adaptive_behaviors_local_path = os.path.join(
             ".agentcrew", self.ADAPTIVE_BEHAVIORS_FILE
+        )
+        self.prompt_evolutions_file_path = os.path.join(
+            self.base_dir, self.PROMPT_EVOLUTIONS_FILE
         )
 
         # _ensure_dir already raises OSError on failure
@@ -805,3 +809,32 @@ class ContextPersistenceService:
             return {}
 
         return adaptive_data
+
+    def store_prompt_evolution(self, agent_name: str, record: Dict[str, Any]) -> None:
+        history = self._read_json_file(
+            self.prompt_evolutions_file_path, default_value={}
+        )
+        if not isinstance(history, dict):
+            history = {}
+
+        agent_history = history.get(agent_name, [])
+        if not isinstance(agent_history, list):
+            agent_history = []
+
+        stored_record = {
+            "timestamp": datetime.datetime.now().isoformat(),
+            **record,
+        }
+        agent_history.append(stored_record)
+        history[agent_name] = agent_history
+        self._write_json_file(self.prompt_evolutions_file_path, history)
+
+    def list_prompt_evolutions(self, agent_name: str) -> List[Dict[str, Any]]:
+        history = self._read_json_file(
+            self.prompt_evolutions_file_path, default_value={}
+        )
+        if not isinstance(history, dict):
+            return []
+
+        agent_history = history.get(agent_name, [])
+        return agent_history if isinstance(agent_history, list) else []

@@ -302,7 +302,7 @@ class InputHandler:
             show_frame=True,
         )
 
-    def get_prompt_input(self, prompt_message: str) -> str:
+    def get_prompt_input(self, prompt_message: str, default: str = "") -> str:
         from prompt_toolkit import prompt
 
         kb = KeyBindings()
@@ -315,6 +315,7 @@ class InputHandler:
 
         return prompt(
             HTML(f"<ansiblue>{prompt_message}</ansiblue> "),
+            default=default,
             key_bindings=kb,
             completer=ChatCompleter(self.message_handler),
         )
@@ -344,7 +345,7 @@ class InputHandler:
 
                 self.message_handler.history_manager.reset_position()
 
-                self._input_queue.put(user_input)
+                self._input_queue.put(user_input.rstrip())
                 self.is_message_processing = True
                 self.display_handlers.print_divider()
 

@@ -26,6 +26,72 @@ if TYPE_CHECKING:
 class UIEffects:
     """Handles UI effects like loading animations and live displays."""
 
+    EVOLUTION_FRAMES = [
+        [
+            "        ╭──────╮        ",
+            "        │ ◠  ◠ │        ",
+            "        │  ──  │        ",
+            "        ╰──────╯        ",
+            "         /   \\         ",
+            "        /     \\        ",
+            "       ╱       ╲        ",
+        ],
+        [
+            "       ╭────────╮       ",
+            "       │  ◠  ◠  │       ",
+            "       │   ──   │       ",
+            "       ╰────────╯       ",
+            "        /     \\        ",
+            "       / ·   · \\       ",
+            "      ╱         ╲       ",
+        ],
+        [
+            "    ·  ╭────────╮  ·    ",
+            "   ·   │  ◉  ◉  │   ·   ",
+            "  ·    │   ──   │    ·  ",
+            "   ·   ╰────────╯   ·   ",
+            "    ·   /     \\   ·    ",
+            "   ·   / ·· ·· \\   ·   ",
+            "  ·   ╱         ╲  ·    ",
+        ],
+        [
+            "  ✦ · ╭──────────╮ · ✦ ",
+            "  · ✦ │  ★    ★  │ ✦ · ",
+            "  ✦ · │    ──    │ · ✦ ",
+            "  · ✦ ╰──────────╯ ✦ · ",
+            "  ✦ ·  /       \\   · ✦ ",
+            "  · ✦ / ✦·   ·✦ \\  ✦ · ",
+            "  ✦ ·╱           ╲ · ✦ ",
+        ],
+        [
+            " ✦✦✦╭────────────╮✦✦✦  ",
+            " ✦✦ │   ★    ★   │ ✦✦  ",
+            " ✦  │     ══     │  ✦  ",
+            " ✦✦ ╰────────────╯ ✦✦  ",
+            " ✦✦  /         \\   ✦✦  ",
+            " ✦  / ✦✦ ·✦· ✦✦ \\   ✦  ",
+            " ✦ ╱             ╲  ✦  ",
+        ],
+        [
+            "✦✧✦╭──────────────╮✦✧✦ ",
+            "✧✦✧│   ✦★    ★✦   │✧✦✧ ",
+            "✦✧✦│      ══      │✦✧✦ ",
+            "✧✦✧╰──────────────╯✧✦✧ ",
+            "✦✧✦  /         \\   ✦✧✦ ",
+            "✧✦✧ /  ✦✧✦·✦✧✦  \\  ✧✦✧ ",
+            "✦✧✦╱             ╲ ✦✧✦",
+        ],
+    ]
+
+    EVOLUTION_LABELS = [
+        "Gathering memories...",
+        "Analyzing patterns...",
+        "Extracting traits...",
+        "Synthesizing...",
+        "Evolving prompt...",
+        "Modifying DNA...",
+    ]
+
     def __init__(self, console_ui: ConsoleUI):
         """Initialize UI effects with a console instance."""
         self.console = console_ui.console
@@ -154,6 +220,84 @@ class UIEffects:
         if self._loading_thread and self._loading_thread.is_alive():
             self._loading_thread.join(timeout=0.5)
             self._loading_thread = None
+
+    def _evolution_animation(self, stop_event, agent_name: str):
+        frames = self.EVOLUTION_FRAMES
+        labels = self.EVOLUTION_LABELS
+        total_frames = len(frames)
+        frame_cycle = itertools.cycle(range(total_frames))
+        label_cycle = itertools.cycle(labels)
+        sparkle_cycle = itertools.cycle(["✦", "✧", "✦", "·", "✧", "✦"])
+        start_time = time.time()
+        ticks = 0
+        current_frame_idx = next(frame_cycle)
+        current_label = next(label_cycle)
+
+        with Live(
+            "", console=self.console, auto_refresh=True, refresh_per_second=4
+        ) as live:
+            while not stop_event.is_set():
+                elapsed = time.time() - start_time
+
+                if ticks > 0 and ticks % 10 == 0:
+                    current_frame_idx = next(frame_cycle)
+                    current_label = next(label_cycle)
+
+                sparkle = next(sparkle_cycle)
+                art = "\n".join(frames[current_frame_idx])
+
+                panel_content = Text.from_markup(
+                    f"[bold yellow]{art}[/]\n\n"
+                    f"   {sparkle} [bold cyan]{current_label}[/] {sparkle}\n"
+                    f"   [dim]{int(elapsed)}s elapsed[/]"
+                )
+                live.update(
+                    Panel(
+                        panel_content,
+                        title=Text(
+                            f"🧬 {agent_name} is evolving...",
+                            style="bold yellow",
+                        ),
+                        border_style="yellow",
+                        box=HORIZONTALS,
+                        width=42,
+                    )
+                )
+                ticks += 1
+                time.sleep(0.3)
+            live.update("")
+            live.stop()
+            import sys
+
+            sys.stdout.write("\x1b[1A")
+            sys.stdout.write("\x1b[2K")
+
+    def start_evolution_animation(self, agent_name: str = "Agent"):
+        if (
+            hasattr(self, "_evolution_thread")
+            and self._evolution_thread
+            and self._evolution_thread.is_alive()
+        ):
+            return
+        self._evolution_stop_event = threading.Event()
+        self._evolution_thread = threading.Thread(
+            target=self._evolution_animation,
+            args=(self._evolution_stop_event, agent_name),
+        )
+        self._evolution_thread.daemon = True
+        self._evolution_thread.start()
+
+    def stop_evolution_animation(self):
+        if hasattr(self, "_evolution_stop_event") and self._evolution_stop_event:
+            self._evolution_stop_event.set()
+            self._evolution_stop_event = None
+        if (
+            hasattr(self, "_evolution_thread")
+            and self._evolution_thread
+            and self._evolution_thread.is_alive()
+        ):
+            self._evolution_thread.join(timeout=1.0)
+            self._evolution_thread = None
 
     def start_streaming_response(self, agent_name: str, is_thinking=False):
         """Start streaming the assistant's response."""
@@ -294,6 +438,7 @@ class UIEffects:
     def cleanup(self):
         """Clean up all running effects."""
         self.stop_loading_animation()
+        self.stop_evolution_animation()
         self.finish_live_update()
         with self._delegate_lock:
             self._delegate_agents.clear()

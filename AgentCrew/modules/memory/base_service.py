@@ -163,3 +163,41 @@ class BaseMemoryService(ABC):
             Dict with success status and count of deleted memories
         """
         pass
+
+    @abstractmethod
+    def get_agent_memory_corpus(
+        self,
+        agent_name: str,
+        max_items: int = 100,
+        exclude_session_id: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Return a structured memory corpus for an agent.
+
+        Args:
+            agent_name: Agent name to scope memories to.
+            max_items: Maximum number of memories to return.
+            exclude_session_id: Optional session id to exclude from results.
+
+        Returns:
+            List of memory records containing id, document, and metadata.
+        """
+        pass
+
+    @abstractmethod
+    def mark_memories_evolved(
+        self,
+        memory_ids: List[str],
+        agent_name: str,
+    ) -> int:
+        """
+        Mark memory records as consumed by a prompt evolution.
+
+        Args:
+            memory_ids: List of memory IDs to mark.
+            agent_name: Agent name the memories belong to.
+
+        Returns:
+            Number of memories successfully marked.
+        """
+        pass

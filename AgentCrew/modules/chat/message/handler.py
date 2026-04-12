@@ -75,6 +75,7 @@ class MessageHandler(Observable):
         self.stop_streaming = False
         self.streamline_messages = []
         self.current_conversation_id: Optional[str] = None  # ID for persistence
+        self.pending_evolution_proposal: Optional[dict] = None
 
         # Initialize components
         self.command_processor = CommandProcessor(self)
@@ -225,6 +226,126 @@ class MessageHandler(Observable):
         Resolve a pending tool confirmation future with the user's decision.
         """
         self.tool_manager.resolve_tool_confirmation(confirmation_id, result)
+
+    async def start_evolution_review(self) -> bool:
+        from AgentCrew.modules.agents.prompt_evolution_service import (
+            PromptEvolutionService,
+        )
+
+        self.prompt_evolution_service = PromptEvolutionService(
+            memory_service=self.memory_service,
+            persistence_service=self.persistent_service,
+        )
+
+        if not isinstance(
+            self.agent,
+            AgentManager.get_instance().get_local_agent(self.agent.name).__class__,
+        ):
+            self._notify("error", "/evolve is only supported with LocalAgent.")
+            return True
+
+        self._notify(
+            "evolution_started",
+            {"agent_name": self.agent.name},
+        )
+        try:
+            proposal = await self.prompt_evolution_service.create_evolution_proposal(
+                self.agent
+            )
+        except Exception as e:
+            self._notify("evolution_finished", None)
+            self._notify("error", f"Prompt evolution failed: {str(e)}")
+            return True
+
+        self.pending_evolution_proposal = proposal
+        self._notify("evolution_summary_ready", proposal)
+        return True
+
+    async def approve_pending_evolution(self) -> bool:
+        proposal = self.pending_evolution_proposal
+        if not proposal:
+            self._notify("error", "No pending evolution proposal to accept.")
+            return True
+        return await self._apply_pending_evolution(
+            proposal.get("approved_summary")
+            or proposal.get("generated_summary")
+            or proposal.get("user_editable_summary", ""),
+            edited_by_user=False,
+        )
+
+    async def edit_and_approve_pending_evolution(self, approved_summary: str) -> bool:
+        proposal = self.pending_evolution_proposal
+        if not proposal:
+            self._notify("error", "No pending evolution proposal to edit.")
+            return True
+
+        approved_summary = approved_summary.strip()
+        if not approved_summary:
+            self._notify("error", "Edited evolution summary cannot be empty.")
+            return True
+
+        proposal["approved_summary"] = approved_summary
+        proposal["user_editable_summary"] = approved_summary
+        return await self._apply_pending_evolution(
+            approved_summary,
+            edited_by_user=True,
+        )
+
+    async def decline_pending_evolution(self) -> bool:
+        if not self.pending_evolution_proposal:
+            self._notify("error", "No pending evolution proposal to decline.")
+            return True
+        self.pending_evolution_proposal = None
+        self._notify("evolution_declined", None)
+        self._notify("system_message", "Prompt evolution declined.")
+        return True
+
+    async def _apply_pending_evolution(
+        self, approved_summary: str, edited_by_user: bool
+    ) -> bool:
+        proposal = self.pending_evolution_proposal
+        if not proposal:
+            self._notify("error", "No pending evolution proposal to apply.")
+            return True
+
+        if not isinstance(
+            self.agent,
+            AgentManager.get_instance().get_local_agent(self.agent.name).__class__,
+        ):
+            self._notify("error", "/evolve is only supported with LocalAgent.")
+            return True
+
+        self._notify(
+            "evolution_started",
+            {"agent_name": self.agent.name},
+        )
+        try:
+            revised_prompt = await self.prompt_evolution_service.build_revised_prompt(
+                self.agent,
+                approved_summary,
+            )
+            result = self.prompt_evolution_service.apply_prompt_revision(
+                self.agent,
+                revised_prompt,
+                approved_summary,
+                generated_summary=proposal.get("generated_summary")
+                or proposal.get("user_editable_summary", ""),
+                memory_ids=proposal.get("memory_ids", []),
+                edited_by_user=edited_by_user,
+            )
+        except Exception as e:
+            self._notify("error", f"Prompt evolution failed: {str(e)}")
+            return True
+        finally:
+            self._notify("evolution_finished", None)
+
+        self.pending_evolution_proposal = None
+        self._notify("evolution_applied", result)
+        self._notify(
+            "system_message",
+            f"Updated persisted system prompt for {result['agent_name']}.",
+        )
+        return True
 
     async def get_assistant_response(
         self, input_tokens=0, output_tokens=0

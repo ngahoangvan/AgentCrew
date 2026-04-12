@@ -159,6 +159,7 @@ class GuiCommandCompleter:
             "/retry",
             "/toggle_transfer",
             "/agent_mode",
+            "/evolve",
             "/exit",
             "/quit",
         ]

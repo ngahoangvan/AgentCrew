@@ -217,6 +217,50 @@ class ConsoleUI(Observer):
             self.display_handlers.display_message(jump_text)
             self.display_handlers.display_message(preview_text)
             self.input_handler.set_current_buffer(data["message"])
+        elif event == "evolution_summary_ready":
+            self.ui_effects.stop_evolution_animation()
+            self.display_handlers.display_evolution_summary(data)
+            self.input_handler._stop_input_thread()
+            choice = self.input_handler.get_choice_input(
+                "Review prompt evolution proposal:",
+                ["accept", "edit", "decline"],
+                default="accept",
+            )
+            if choice == "accept":
+                asyncio.run(self.message_handler.approve_pending_evolution())
+            elif choice == "edit":
+                edited_summary = self.input_handler.get_prompt_input(
+                    "Edit approved summary:",
+                    default=data.get("approved_summary", ""),
+                )
+                if edited_summary.strip():
+                    asyncio.run(
+                        self.message_handler.edit_and_approve_pending_evolution(
+                            edited_summary.strip()
+                        )
+                    )
+                else:
+                    asyncio.run(self.message_handler.decline_pending_evolution())
+            else:
+                asyncio.run(self.message_handler.decline_pending_evolution())
+            self.input_handler._start_input_thread()
+        elif event == "evolution_applied":
+            self.ui_effects.stop_evolution_animation()
+            result_text = Text(
+                "🧬 Prompt evolution applied for ", style=RICH_STYLE_YELLOW
+            )
+            result_text.append(data["agent_name"], style=RICH_STYLE_GREEN)
+            self.display_handlers.display_message(result_text)
+        elif event == "evolution_declined":
+            self.display_handlers.display_message(
+                Text("Prompt evolution declined.", style=RICH_STYLE_YELLOW)
+            )
+        elif event == "evolution_started":
+            self.ui_effects.start_evolution_animation(
+                data.get("agent_name", "Agent") if data else "Agent"
+            )
+        elif event == "evolution_finished":
+            self.ui_effects.stop_evolution_animation()
         elif event == "file_processing":
             self.ui_effects.stop_loading_animation()  # Stop loading on first chunk
             self.display_handlers.add_file(data["file_path"])

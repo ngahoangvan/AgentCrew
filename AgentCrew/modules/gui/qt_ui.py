@@ -510,6 +510,11 @@ class ChatWindow(QMainWindow, Observer):
             "model_changed",
             "think_budget_set",
             "jump_performed",
+            "evolution_started",
+            "evolution_finished",
+            "evolution_summary_ready",
+            "evolution_applied",
+            "evolution_declined",
         ]
 
         if event in message_events:

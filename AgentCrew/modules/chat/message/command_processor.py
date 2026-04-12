@@ -57,6 +57,8 @@ class CommandProcessor:
             return CommandResult(handled=True, clear_flag=True)
         elif user_input.lower().startswith("/consolidate"):
             return await self._handle_consolidate_command(user_input)
+        elif user_input.lower().startswith("/evolve"):
+            return await self._handle_evolve_command(user_input)
         elif user_input.lower().startswith("/unconsolidate"):
             return await self._handle_unconsolidate_command(user_input)
         elif user_input.lower().startswith("/jump "):
@@ -213,6 +215,10 @@ class CommandProcessor:
                 "error", f"Error during consolidation: {str(e)}"
             )
             return CommandResult(handled=True, clear_flag=True)
+
+    async def _handle_evolve_command(self, user_input: str) -> CommandResult:
+        await self.message_handler.start_evolution_review()
+        return CommandResult(handled=True, clear_flag=True)
 
     async def _handle_unconsolidate_command(self, user_input: str) -> CommandResult:
         """Handle unconsolidate command to remove last consolidated message."""

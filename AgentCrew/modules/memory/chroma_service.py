@@ -1,7 +1,7 @@
 from __future__ import annotations
 import os
 import uuid
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, List, Dict, Any, Optional
 from datetime import datetime, timedelta
 from loguru import logger
 
@@ -10,7 +10,6 @@ from .memory_worker import MemoryWorker, RELEVANT_THRESHOLD
 from AgentCrew.modules.prompts.constants import SEMANTIC_EXTRACTING
 
 if TYPE_CHECKING:
-    from typing import List, Dict, Any, Optional
     from chromadb import Collection
     from AgentCrew.modules.llm.base import BaseLLMService
 
@@ -346,6 +345,91 @@ class ChromaMemoryService(BaseMemoryService):
             collection.delete(ids=ids_to_remove)
 
         return len(ids_to_remove)
+
+    def get_agent_memory_corpus(
+        self,
+        agent_name: str,
+        max_items: int = 100,
+        exclude_session_id: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        collection = self._initialize_collection()
+
+        if not agent_name.strip() or max_items <= 0:
+            return []
+
+        and_conditions: List[Dict[str, Any]] = [{"agent": agent_name}]
+        session_to_exclude = exclude_session_id or self.session_id
+        if session_to_exclude.strip():
+            and_conditions.append({"session_id": {"$ne": session_to_exclude}})
+
+        records = collection.get(
+            where={"$and": and_conditions}
+            if len(and_conditions) > 1
+            else and_conditions[0],
+            include=["documents", "metadatas"],
+        )
+
+        ids = records.get("ids") or []
+        documents = records.get("documents") or []
+        metadatas = records.get("metadatas") or []
+
+        corpus: List[Dict[str, Any]] = []
+        for item_id, document, metadata in zip(ids, documents, metadatas):
+            metadata = metadata or {}
+            if metadata.get("evolved_at"):
+                continue
+            sort_key = metadata.get("date") or metadata.get("timestamp") or ""
+            corpus.append(
+                {
+                    "id": item_id,
+                    "document": document,
+                    "metadata": metadata,
+                    "sort_key": sort_key,
+                }
+            )
+
+        corpus.sort(key=lambda item: item["sort_key"], reverse=True)
+        return [
+            {
+                "id": item["id"],
+                "document": item["document"],
+                "metadata": item["metadata"],
+            }
+            for item in corpus[:max_items]
+        ]
+
+    def mark_memories_evolved(
+        self,
+        memory_ids: List[str],
+        agent_name: str,
+    ) -> int:
+        if not memory_ids:
+            return 0
+
+        collection = self._initialize_collection()
+        timestamp = datetime.now().isoformat()
+        marked = 0
+
+        existing = collection.get(
+            ids=memory_ids,
+            include=["documents", "metadatas", "embeddings"],
+        )
+
+        for i, mid in enumerate(existing["ids"]):
+            meta = dict(existing["metadatas"][i] or {})
+            if meta.get("agent") != agent_name:
+                continue
+            meta["evolved_at"] = timestamp
+            collection.update(
+                ids=[mid],
+                metadatas=[meta],
+            )
+            marked += 1
+
+        logger.info(
+            f"Marked {marked}/{len(memory_ids)} memories as evolved for {agent_name}"
+        )
+        return marked
 
     def forget_topic(
         self,

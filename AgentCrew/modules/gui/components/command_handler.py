@@ -4,6 +4,10 @@ import pyperclip
 from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import Slot
 
+from AgentCrew.modules.gui.widgets.evolution_loading_dialog import (
+    EvolutionLoadingDialog,
+)
+
 
 class CommandHandler:
     """Handles command processing and execution for the chat window."""
@@ -13,6 +17,11 @@ class CommandHandler:
 
         if isinstance(chat_window, ChatWindow):
             self.chat_window = chat_window
+        self._evolution_loading_dialog = None
+
+    def _hide_evolution_loading_dialog(self):
+        if self._evolution_loading_dialog is not None:
+            self._evolution_loading_dialog.hide()
 
     def process_command(self, user_input: str) -> bool:
         """
@@ -50,7 +59,11 @@ class CommandHandler:
             self.chat_window.llm_worker.process_request.emit(user_input)
             self.chat_window.ui_state_manager.set_input_controls_enabled(True)
             return True
-        elif user_input.startswith("/consolidate ") or user_input.startswith("/agent "):
+        elif (
+            user_input.startswith("/consolidate ")
+            or user_input.startswith("/agent ")
+            or user_input.startswith("/evolve")
+        ):
             self.chat_window.llm_worker.process_request.emit(user_input)
             self.chat_window.ui_state_manager.set_input_controls_enabled(False)
             return True
@@ -407,6 +420,79 @@ class CommandHandler:
         elif event == "jump_performed":
             self.chat_window.chat_components.add_system_message(
                 f"🕰️ Jumped to turn {data['turn_number']}: {data['preview']}"
+            )
+            return True
+        elif event == "evolution_started":
+            agent_name = (
+                data.get("agent_name", "Agent") if isinstance(data, dict) else "Agent"
+            )
+            self.chat_window.chat_components.add_system_message(
+                f"🧬 Starting prompt evolution for {agent_name}..."
+            )
+            self.chat_window.display_status_message(f"Evolving {agent_name} prompt...")
+            self.chat_window.ui_state_manager.set_input_controls_enabled(False)
+            if self._evolution_loading_dialog is None:
+                self._evolution_loading_dialog = EvolutionLoadingDialog(
+                    self.chat_window, agent_name=agent_name
+                )
+            else:
+                self._evolution_loading_dialog.set_agent_name(agent_name)
+            self._evolution_loading_dialog.show()
+            self._evolution_loading_dialog.raise_()
+            self._evolution_loading_dialog.activateWindow()
+            return True
+        elif event == "evolution_summary_ready":
+            from AgentCrew.modules.gui.widgets.evolution_review_dialog import (
+                EvolutionReviewDialog,
+            )
+
+            self._hide_evolution_loading_dialog()
+
+            dialog = EvolutionReviewDialog(
+                self.chat_window,
+                agent_name=data.get("agent_name", ""),
+                summary=data.get("user_editable_summary", ""),
+                analysis_summary=data.get("analysis_summary"),
+                source_memory_count=data.get("source_memory_count", 0),
+            )
+            if dialog.exec():
+                summary = dialog.get_summary()
+                if summary:
+                    self.chat_window.llm_worker.process_evolution_action.emit(
+                        "edit", summary
+                    )
+                    self.chat_window.ui_state_manager.set_input_controls_enabled(False)
+                else:
+                    self.chat_window.llm_worker.process_evolution_action.emit(
+                        "decline", ""
+                    )
+                    self.chat_window.ui_state_manager.set_input_controls_enabled(True)
+            else:
+                self.chat_window.llm_worker.process_evolution_action.emit("decline", "")
+                self.chat_window.ui_state_manager.set_input_controls_enabled(True)
+            return True
+        elif event == "evolution_applied":
+            self._hide_evolution_loading_dialog()
+            self.chat_window.chat_components.add_system_message(
+                f"Updated persisted system prompt for {data['agent_name']}."
+            )
+            self.chat_window.display_status_message(
+                f"Prompt evolution applied for {data['agent_name']}"
+            )
+            self.chat_window.ui_state_manager.set_input_controls_enabled(True)
+            return True
+        elif event == "evolution_declined":
+            self._hide_evolution_loading_dialog()
+            self.chat_window.chat_components.add_system_message(
+                "Prompt evolution declined."
+            )
+            self.chat_window.display_status_message("Prompt evolution declined")
+            self.chat_window.ui_state_manager.set_input_controls_enabled(True)
+            return True
+        elif event == "evolution_finished":
+            self._hide_evolution_loading_dialog()
+            self.chat_window.display_status_message(
+                "Prompt evolution processing finished"
             )
             return True
 

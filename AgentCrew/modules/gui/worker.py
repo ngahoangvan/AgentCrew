@@ -12,18 +12,17 @@ from loguru import logger
 class LLMWorker(QObject):
     """Worker object that processes LLM requests in a separate thread"""
 
-    # Signals for thread communication
-    response_ready = Signal(str, int, int)  # response, input_tokens, output_tokens
+    response_ready = Signal(str, int, int)
     error = Signal(str)
     status_message = Signal(str)
     request_exit = Signal()
     request_clear = Signal()
-    thinking_started = Signal(str)  # agent_name
-    thinking_chunk = Signal(str)  # thinking text chunk
+    thinking_started = Signal(str)
+    thinking_chunk = Signal(str)
     thinking_completed = Signal()
 
-    # Signal to request processing - passing the user input as a string
     process_request = Signal(str)
+    process_evolution_action = Signal(str, str)
 
     def __init__(self):
         super().__init__()
@@ -33,8 +32,8 @@ class LLMWorker(QObject):
     def connect_handler(self, message_handler: MessageHandler):
         """Connect to the message handler - called from main thread before processing begins"""
         self.message_handler = message_handler
-        # Connect the process_request signal to our processing slot
         self.process_request.connect(self.process_input)
+        self.process_evolution_action.connect(self.process_evolution)
 
     @Slot(str)
     def process_input(self, user_input):
@@ -85,4 +84,27 @@ class LLMWorker(QObject):
             traceback_str = traceback.format_exc()
             error_msg = f"{str(e)}\n{traceback_str}"
             logger.error(f"Error in LLMWorker: {error_msg}")
+            self.error.emit(str(e))
+
+    @Slot(str, str)
+    def process_evolution(self, action: str, summary: str = ""):
+        try:
+            if not self.message_handler:
+                self.error.emit("Message handler not connected")
+                return
+
+            if action == "approve":
+                asyncio.run(self.message_handler.approve_pending_evolution())
+            elif action == "edit":
+                asyncio.run(
+                    self.message_handler.edit_and_approve_pending_evolution(summary)
+                )
+            elif action == "decline":
+                self.message_handler.decline_pending_evolution()
+            else:
+                self.error.emit(f"Unknown evolution action: {action}")
+        except Exception as e:
+            traceback_str = traceback.format_exc()
+            error_msg = f"{str(e)}\n{traceback_str}"
+            logger.error(f"Error in LLMWorker evolution action: {error_msg}")
             self.error.emit(str(e))

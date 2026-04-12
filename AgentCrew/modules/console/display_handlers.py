@@ -14,6 +14,7 @@ from rich.box import HORIZONTALS, SIMPLE, SQUARE
 from rich.markdown import Markdown
 from rich.text import Text
 from rich.panel import Panel
+from rich.table import Table
 
 from .constants import (
     RICH_STYLE_YELLOW,
@@ -167,7 +168,9 @@ class DisplayHandlers:
         formatted = []
 
         for i, msg in enumerate(messages):
-            formatted_msg = {"#": i}
+            formatted_msg = {}
+
+            formatted_msg["#"] = i
 
             if "role" in msg:
                 formatted_msg["role"] = msg["role"]
@@ -368,6 +371,59 @@ class DisplayHandlers:
             f"  • ~{result['original_token_count'] - result['consolidated_token_count']} tokens saved"
         )
 
+    def display_evolution_summary(self, proposal: Dict[str, Any]):
+        """Display a prompt evolution review summary."""
+        summary = proposal.get("analysis_summary", {})
+        table = Table(show_header=False, box=HORIZONTALS, expand=True)
+        table.add_column(style=RICH_STYLE_YELLOW_BOLD, width=28)
+        table.add_column(style=RICH_STYLE_WHITE)
+
+        table.add_row("Agent", proposal.get("agent_name", "Unknown"))
+        table.add_row(
+            "Memories analyzed",
+            str(proposal.get("source_memory_count", 0)),
+        )
+
+        for label, key in (
+            ("Durable traits", "durable_traits"),
+            ("Output preferences", "output_preferences"),
+            ("Recurring corrections", "recurring_user_corrections"),
+            ("Workflow patterns", "workflow_patterns"),
+            ("Tool usage preferences", "tool_usage_preferences"),
+        ):
+            items = summary.get(key, [])
+            value = "\n".join(f"• {item.get('item', '')}" for item in items) or "None"
+            table.add_row(label, value)
+
+        confidence_notes = summary.get("confidence_notes", [])
+        if confidence_notes:
+            table.add_row(
+                "Confidence notes",
+                "\n".join(f"• {note}" for note in confidence_notes),
+            )
+
+        editable_summary = proposal.get("user_editable_summary", "")
+        panel_group = Group(
+            table,
+            Text("", style=RICH_STYLE_WHITE),
+            Text("Editable approved summary:", style=RICH_STYLE_BLUE_BOLD),
+            Markdown(
+                editable_summary or "_No summary generated_", code_theme=CODE_THEME
+            ),
+            Text(
+                "Choose Accept, Edit, or Decline in the next prompt.",
+                style=RICH_STYLE_BLUE,
+            ),
+        )
+        self.console.print(
+            Panel(
+                panel_group,
+                box=SQUARE,
+                title=Text("🧬 Prompt Evolution Review", style=RICH_STYLE_YELLOW_BOLD),
+                border_style=RICH_STYLE_YELLOW,
+            )
+        )
+
     def display_loaded_conversation(self, messages: List, default_agent_name: str):
         """Display all messages from a loaded conversation."""
         last_consolidated_idx = 0
@@ -550,6 +606,14 @@ class DisplayHandlers:
             ),
             Text(
                 "Use '/consolidate [count]' to summarize older messages (default: 10 recent messages preserved).",
+                style=RICH_STYLE_YELLOW,
+            ),
+            Text(
+                "Use '/evolve' to analyze current local-agent memory and propose a persisted system prompt evolution.",
+                style=RICH_STYLE_YELLOW,
+            ),
+            Text(
+                "Review and approve, edit, or decline the proposal in the interactive review UI after '/evolve'.",
                 style=RICH_STYLE_YELLOW,
             ),
             Text(

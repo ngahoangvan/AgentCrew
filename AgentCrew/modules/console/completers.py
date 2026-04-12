@@ -259,6 +259,10 @@ class ChatCompleter(Completer):
                 "Consolidate conversation messages (usage: /consolidate [count])",
             ),
             (
+                "/evolve",
+                "Analyze agent memory and propose a persisted system prompt evolution (usage: /evolve [accept|edit <summary>|decline])",
+            ),
+            (
                 "/unconsolidate",
                 "Remove the last consolidated message (usage: /unconsolidate)",
             ),

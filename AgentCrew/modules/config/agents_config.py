@@ -113,6 +113,25 @@ class AgentsConfig:
             if was_active:
                 agent_manager.select_agent(agent.name)
 
+    def update_agent_system_prompt(self, agent_name: str, new_prompt: str) -> bool:
+        config_data = self.read()
+        agents = config_data.get("agents", [])
+        if not isinstance(agents, list):
+            return False
+
+        updated = False
+        for agent in agents:
+            if agent.get("name") == agent_name:
+                agent["system_prompt"] = new_prompt
+                updated = True
+                break
+
+        if not updated:
+            return False
+
+        self.write(config_data)
+        return True
+
     def export(
         self, agent_names: List[str], output_file: str, file_format: str = "toml"
     ) -> Dict[str, Any]:
