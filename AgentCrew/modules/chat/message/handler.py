@@ -79,6 +79,7 @@ class MessageHandler(Observable):
         self._active_stream_session: Optional[StreamSession] = None
         self.current_conversation_id: Optional[str] = None  # ID for persistence
         self.pending_evolution_proposal: Optional[dict] = None
+        self.prompt_evolution_service = None
 
         # Initialize components
         self.command_processor = CommandProcessor(self)
@@ -264,38 +265,68 @@ class MessageHandler(Observable):
         self._notify("evolution_summary_ready", proposal)
         return True
 
+    def _get_pending_evolution_proposal(self) -> Optional[dict]:
+        return self.pending_evolution_proposal
+
+    def _get_effective_evolution_summary(self, proposal: dict) -> str:
+        return (
+            proposal.get("approved_summary")
+            or proposal.get("generated_summary")
+            or proposal.get("user_editable_summary", "")
+        )
+
+    def _update_pending_evolution_summary(self, approved_summary: str) -> str:
+        proposal = self._get_pending_evolution_proposal()
+        if not proposal:
+            raise ValueError("No pending evolution proposal to edit.")
+
+        normalized_summary = approved_summary.strip()
+        if not normalized_summary:
+            raise ValueError("Edited evolution summary cannot be empty.")
+
+        proposal["approved_summary"] = normalized_summary
+        proposal["user_editable_summary"] = normalized_summary
+        return normalized_summary
+
     async def approve_pending_evolution(self) -> bool:
-        proposal = self.pending_evolution_proposal
+        proposal = self._get_pending_evolution_proposal()
         if not proposal:
             self._notify("error", "No pending evolution proposal to accept.")
             return True
         return await self._apply_pending_evolution(
-            proposal.get("approved_summary")
-            or proposal.get("generated_summary")
-            or proposal.get("user_editable_summary", ""),
+            self._get_effective_evolution_summary(proposal),
             edited_by_user=False,
         )
 
+    async def submit_pending_evolution_review(
+        self, action: str, approved_summary: Optional[str] = None
+    ) -> bool:
+        if action == "accept":
+            return await self.approve_pending_evolution()
+        if action == "edit":
+            return await self.edit_and_approve_pending_evolution(approved_summary or "")
+        if action == "decline":
+            return await self.decline_pending_evolution()
+
+        self._notify("error", f"Unknown evolution review action: {action}")
+        return True
+
     async def edit_and_approve_pending_evolution(self, approved_summary: str) -> bool:
-        proposal = self.pending_evolution_proposal
-        if not proposal:
-            self._notify("error", "No pending evolution proposal to edit.")
+        try:
+            normalized_summary = self._update_pending_evolution_summary(
+                approved_summary
+            )
+        except ValueError as e:
+            self._notify("error", str(e))
             return True
 
-        approved_summary = approved_summary.strip()
-        if not approved_summary:
-            self._notify("error", "Edited evolution summary cannot be empty.")
-            return True
-
-        proposal["approved_summary"] = approved_summary
-        proposal["user_editable_summary"] = approved_summary
         return await self._apply_pending_evolution(
-            approved_summary,
+            normalized_summary,
             edited_by_user=True,
         )
 
     async def decline_pending_evolution(self) -> bool:
-        if not self.pending_evolution_proposal:
+        if not self._get_pending_evolution_proposal():
             self._notify("error", "No pending evolution proposal to decline.")
             return True
         self.pending_evolution_proposal = None
@@ -309,6 +340,9 @@ class MessageHandler(Observable):
         proposal = self.pending_evolution_proposal
         if not proposal:
             self._notify("error", "No pending evolution proposal to apply.")
+            return True
+        if not self.prompt_evolution_service:
+            self._notify("error", "Evolution is not available")
             return True
 
         if not isinstance(

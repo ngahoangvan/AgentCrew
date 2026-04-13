@@ -183,6 +183,9 @@ Output ONLY the complete revised system prompt. No commentary, no explanation, n
         edited_by_user: bool = False,
     ) -> Dict[str, Any]:
         previous_prompt = agent.get_system_prompt()
+        normalized_generated_summary = generated_summary or approved_summary
+        normalized_memory_ids = memory_ids or []
+
         if not self.agents_config.update_agent_system_prompt(
             agent.name, revised_prompt
         ):
@@ -191,23 +194,35 @@ Output ONLY the complete revised system prompt. No commentary, no explanation, n
         refreshed_agent = AgentManager.get_instance().get_local_agent(agent.name)
         if isinstance(refreshed_agent, LocalAgent):
             refreshed_agent.set_system_prompt(revised_prompt)
-
-        if self.persistence_service:
-            self.persistence_service.store_prompt_evolution(
-                agent.name,
-                {
-                    "previous_system_prompt": previous_prompt,
-                    "generated_summary": generated_summary or approved_summary,
-                    "approved_summary": approved_summary,
-                    "revised_system_prompt": revised_prompt,
-                    "memory_ids": memory_ids or [],
-                    "edited_by_user": edited_by_user,
-                },
+        else:
+            logger.warning(
+                f"Persisted prompt revision for agent '{agent.name}' but could not refresh the in-memory local agent instance."
             )
 
-        if self.memory_service and memory_ids:
+        if self.persistence_service:
             try:
-                self.memory_service.mark_memories_evolved(memory_ids, agent.name)
+                self.persistence_service.store_prompt_evolution(
+                    agent.name,
+                    {
+                        "previous_system_prompt": previous_prompt,
+                        "generated_summary": normalized_generated_summary,
+                        "approved_summary": approved_summary,
+                        "revised_system_prompt": revised_prompt,
+                        "memory_ids": normalized_memory_ids,
+                        "edited_by_user": edited_by_user,
+                    },
+                )
+            except Exception as e:
+                logger.error(
+                    f"Prompt revision persisted for agent '{agent.name}' but failed to store evolution audit record: {e}"
+                )
+                raise ValueError(
+                    f"Prompt was persisted for agent '{agent.name}', but storing the prompt evolution audit record failed: {e}"
+                ) from e
+
+        if self.memory_service and normalized_memory_ids:
+            try:
+                self.memory_service.mark_memories_evolved(normalized_memory_ids, agent.name)
             except Exception as e:
                 logger.warning(f"Failed to mark memories as evolved: {e}")
 
@@ -215,7 +230,7 @@ Output ONLY the complete revised system prompt. No commentary, no explanation, n
             "agent_name": agent.name,
             "previous_system_prompt": previous_prompt,
             "revised_system_prompt": revised_prompt,
-            "generated_summary": generated_summary or approved_summary,
+            "generated_summary": normalized_generated_summary,
             "accepted_summary": approved_summary,
             "edited_by_user": edited_by_user,
         }

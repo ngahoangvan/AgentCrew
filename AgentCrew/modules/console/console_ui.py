@@ -243,22 +243,30 @@ class ConsoleUI(Observer):
                 default="accept",
             )
             if choice == "accept":
-                asyncio.run(self.message_handler.approve_pending_evolution())
+                asyncio.run(
+                    self.message_handler.submit_pending_evolution_review("accept")
+                )
             elif choice == "edit":
                 edited_summary = self.input_handler.get_prompt_input(
                     "Edit approved summary(Alt+Enter to submit):",
-                    default=data.get("approved_summary", ""),
+                    default=data.get("user_editable_summary", ""),
                 )
                 if edited_summary.strip():
                     asyncio.run(
-                        self.message_handler.edit_and_approve_pending_evolution(
-                            edited_summary.strip()
+                        self.message_handler.submit_pending_evolution_review(
+                            "edit", edited_summary.strip()
                         )
                     )
                 else:
-                    asyncio.run(self.message_handler.decline_pending_evolution())
+                    asyncio.run(
+                        self.message_handler.submit_pending_evolution_review(
+                            "decline"
+                        )
+                    )
             else:
-                asyncio.run(self.message_handler.decline_pending_evolution())
+                asyncio.run(
+                    self.message_handler.submit_pending_evolution_review("decline")
+                )
             self.input_handler._start_input_thread()
         elif event == "evolution_applied":
             self.ui_effects.stop_evolution_animation()

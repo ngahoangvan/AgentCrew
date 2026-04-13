@@ -1,15 +1,22 @@
 import base64
 import json
 import time
+from datetime import datetime, timezone
 
 from AgentCrew.modules.openai_codex.oauth import OpenAICodexOAuth
 
 
 def _jwt_with_exp(exp_seconds: int) -> str:
-    header = base64.urlsafe_b64encode(b'{"alg":"none","typ":"JWT"}').rstrip(b"=").decode("ascii")
-    payload = base64.urlsafe_b64encode(
-        json.dumps({"exp": exp_seconds}).encode("utf-8")
-    ).rstrip(b"=").decode("ascii")
+    header = (
+        base64.urlsafe_b64encode(b'{"alg":"none","typ":"JWT"}')
+        .rstrip(b"=")
+        .decode("ascii")
+    )
+    payload = (
+        base64.urlsafe_b64encode(json.dumps({"exp": exp_seconds}).encode("utf-8"))
+        .rstrip(b"=")
+        .decode("ascii")
+    )
     return f"{header}.{payload}.signature"
 
 
@@ -87,7 +94,7 @@ class TestOpenAICodexOAuth:
         assert oauth._tokens["id_token"] == "cli-id-token"
         assert oauth._tokens["account_id"] == "account-123"
         assert oauth._tokens["auth_mode"] == "chatgpt"
-        assert oauth._tokens["last_refresh"] == 1712505600000
+        assert oauth._tokens["last_refresh"] == "2024-04-07T12:00:00Z"
         assert oauth._tokens["expires"] == exp_seconds * 1000
         assert oauth.has_valid_tokens is True
 
@@ -107,14 +114,17 @@ class TestOpenAICodexOAuth:
 
         data = json.loads(token_path.read_text(encoding="utf-8"))
         assert data["auth_mode"] == "chatgpt"
-        assert isinstance(data["last_refresh"], int)
+        assert isinstance(data["last_refresh"], str)
+        datetime.fromisoformat(data["last_refresh"].replace("Z", "+00:00"))
         assert data["tokens"]["access_token"] == "new-access"
         assert data["tokens"]["refresh_token"] == "new-refresh"
         assert data["tokens"]["id_token"] == "new-id-token"
         assert data["tokens"]["account_id"] == "account-456"
         assert "openai-codex" not in data
 
-    def test_save_migrates_legacy_nested_file_and_preserves_unrelated_keys(self, tmp_path):
+    def test_save_migrates_legacy_nested_file_and_preserves_unrelated_keys(
+        self, tmp_path
+    ):
         token_path = tmp_path / "auth.json"
         token_path.write_text(
             json.dumps(
@@ -143,10 +153,34 @@ class TestOpenAICodexOAuth:
         assert "openai-codex" not in data
         assert data["custom"] == {"enabled": True}
         assert data["auth_mode"] == "chatgpt"
-        assert isinstance(data["last_refresh"], int)
+        assert isinstance(data["last_refresh"], str)
+        datetime.fromisoformat(data["last_refresh"].replace("Z", "+00:00"))
         assert data["tokens"]["access_token"] == "migrated-access"
         assert data["tokens"]["refresh_token"] == "migrated-refresh"
         assert data["tokens"]["custom_token_metadata"] == "keep-me"
+
+    def test_loads_codex_cli_file_with_legacy_numeric_last_refresh(self, tmp_path):
+        token_path = tmp_path / "auth.json"
+        exp_seconds = int(time.time()) + 3600
+        access_token = _jwt_with_exp(exp_seconds)
+        token_path.write_text(
+            json.dumps(
+                {
+                    "auth_mode": "chatgpt",
+                    "last_refresh": 1712505600000,
+                    "tokens": {
+                        "access_token": access_token,
+                        "refresh_token": "cli-refresh",
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        oauth = OpenAICodexOAuth(token_path=str(token_path))
+
+        assert oauth._tokens["last_refresh"] == "2024-04-07T12:00:00Z"
+        assert oauth._tokens["expires"] == exp_seconds * 1000
 
     def test_loads_codex_cli_file_with_expires_in_fallback(self, tmp_path):
         token_path = tmp_path / "auth.json"

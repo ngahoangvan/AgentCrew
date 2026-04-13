@@ -128,6 +128,45 @@ class TestPromptEvolutionService(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["agent_name"], "Engineer")
         self.persistence_service.store_prompt_evolution.assert_called_once()
 
+    def test_apply_prompt_revision_records_generated_and_approved_summaries_separately(self):
+        self.service.agents_config = MagicMock()
+        self.service.agents_config.update_agent_system_prompt.return_value = True
+        result = self.service.apply_prompt_revision(
+            self.agent,
+            "You are Engineer. Keep placeholders {current_date} and {cwd}. Be concise.",
+            "Approved summary",
+            generated_summary="Generated summary",
+            memory_ids=["m1"],
+            edited_by_user=True,
+        )
+
+        stored_record = self.persistence_service.store_prompt_evolution.call_args[0][1]
+        self.assertEqual(stored_record["generated_summary"], "Generated summary")
+        self.assertEqual(stored_record["approved_summary"], "Approved summary")
+        self.assertTrue(stored_record["edited_by_user"])
+        self.assertEqual(result["generated_summary"], "Generated summary")
+        self.assertEqual(result["accepted_summary"], "Approved summary")
+
+    def test_apply_prompt_revision_raises_when_audit_storage_fails(self):
+        self.service.agents_config = MagicMock()
+        self.service.agents_config.update_agent_system_prompt.return_value = True
+        self.persistence_service.store_prompt_evolution.side_effect = RuntimeError(
+            "audit failed"
+        )
+
+        with self.assertRaises(ValueError) as ctx:
+            self.service.apply_prompt_revision(
+                self.agent,
+                "You are Engineer. Keep placeholders {current_date} and {cwd}. Be concise.",
+                "Approved summary",
+                generated_summary="Generated summary",
+                memory_ids=["m1"],
+                edited_by_user=True,
+            )
+
+        self.assertIn("Prompt was persisted for agent 'Engineer'", str(ctx.exception))
+        self.assertIn("audit record failed", str(ctx.exception))
+
     def test_extract_evolution_fields_parses_xml_memory(self):
         result = self.service._extract_evolution_fields(SAMPLE_MEMORY_XML, 1)
         self.assertIn("Memory #1", result)

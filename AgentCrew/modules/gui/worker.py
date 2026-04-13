@@ -100,16 +100,9 @@ class LLMWorker(QObject):
                 self.error.emit("Message handler not connected")
                 return
 
-            if action == "approve":
-                asyncio.run(self.message_handler.approve_pending_evolution())
-            elif action == "edit":
-                asyncio.run(
-                    self.message_handler.edit_and_approve_pending_evolution(summary)
-                )
-            elif action == "decline":
-                self.message_handler.decline_pending_evolution()
-            else:
-                self.error.emit(f"Unknown evolution action: {action}")
+            asyncio.run(
+                self.message_handler.submit_pending_evolution_review(action, summary)
+            )
         except Exception as e:
             traceback_str = traceback.format_exc()
             error_msg = f"{str(e)}\n{traceback_str}"
