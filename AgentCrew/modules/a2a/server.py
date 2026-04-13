@@ -134,7 +134,9 @@ class A2AServer:
                 return JSONResponse(
                     {"error": f"Agent {agent_name} not found"}, status_code=404
                 )
-            return JSONResponse(agent_card.model_dump(exclude_none=True, by_alias=True))
+            return JSONResponse(
+                agent_card.model_dump(exclude_none=True, by_alias=True, mode="json")
+            )
 
         return get_agent_card
 
@@ -175,7 +177,7 @@ class A2AServer:
                         error=InvalidRequestError(data=e.errors()),
                     )
                     return JSONResponse(
-                        error.model_dump(exclude_none=True), status_code=400
+                        error.model_dump(exclude_none=True, mode="json"), status_code=400
                     )
 
                 # Process based on method
@@ -188,7 +190,7 @@ class A2AServer:
                     logger.debug("Handling message/send request")
                     result = await task_manager.on_send_message(json_rpc_request.root)
                     logger.debug(f"message/send result: {result}")
-                    return JSONResponse(result.model_dump(exclude_none=True))
+                    return JSONResponse(result.model_dump(exclude_none=True, mode="json"))
 
                 elif method == "message/stream" and isinstance(
                     json_rpc_request.root, SendStreamingMessageRequest
@@ -198,12 +200,16 @@ class A2AServer:
                     )
 
                     if isinstance(result_stream, JSONRPCResponse):
-                        return JSONResponse(result_stream.model_dump(exclude_none=True))
+                        return JSONResponse(
+                            result_stream.model_dump(exclude_none=True, mode="json")
+                        )
 
                     async def event_generator():
                         async for item in result_stream:  # type: ignore
                             yield {
-                                "data": json.dumps(item.model_dump(exclude_none=True))
+                                "data": json.dumps(
+                                    item.model_dump(exclude_none=True, mode="json")
+                                )
                             }
 
                     return EventSourceResponse(event_generator())
@@ -214,7 +220,7 @@ class A2AServer:
                     logger.debug("Handling legacy tasks/send request")
                     result = await task_manager.on_send_task(json_rpc_request.root)
                     logger.debug(f"tasks/send result: {result}")
-                    return JSONResponse(result.model_dump(exclude_none=True))
+                    return JSONResponse(result.model_dump(exclude_none=True, mode="json"))
 
                 elif method == "tasks/sendSubscribe" and isinstance(
                     json_rpc_request.root, SendStreamingMessageRequest
@@ -224,12 +230,16 @@ class A2AServer:
                     )
 
                     if isinstance(result_stream, JSONRPCResponse):
-                        return JSONResponse(result_stream.model_dump(exclude_none=True))
+                        return JSONResponse(
+                            result_stream.model_dump(exclude_none=True, mode="json")
+                        )
 
                     async def event_generator():
                         async for item in result_stream:  # type: ignore
                             yield {
-                                "data": json.dumps(item.model_dump(exclude_none=True))
+                                "data": json.dumps(
+                                    item.model_dump(exclude_none=True, mode="json")
+                                )
                             }
 
                     return EventSourceResponse(event_generator())
@@ -238,13 +248,13 @@ class A2AServer:
                     json_rpc_request.root, GetTaskRequest
                 ):
                     result = await task_manager.on_get_task(json_rpc_request.root)
-                    return JSONResponse(result.model_dump(exclude_none=True))
+                    return JSONResponse(result.model_dump(exclude_none=True, mode="json"))
 
                 elif method == "tasks/cancel" and isinstance(
                     json_rpc_request.root, CancelTaskRequest
                 ):
                     result = await task_manager.on_cancel_task(json_rpc_request.root)
-                    return JSONResponse(result.model_dump(exclude_none=True))
+                    return JSONResponse(result.model_dump(exclude_none=True, mode="json"))
 
                 elif method == "tasks/resubscribe" and isinstance(
                     json_rpc_request.root, TaskResubscriptionRequest
@@ -254,12 +264,16 @@ class A2AServer:
                     )
 
                     if isinstance(result_stream, JSONRPCResponse):
-                        return JSONResponse(result_stream.model_dump(exclude_none=True))
+                        return JSONResponse(
+                            result_stream.model_dump(exclude_none=True, mode="json")
+                        )
 
                     async def event_generator():
                         async for item in result_stream:  # type: ignore
                             yield {
-                                "data": json.dumps(item.model_dump(exclude_none=True))
+                                "data": json.dumps(
+                                    item.model_dump(exclude_none=True, mode="json")
+                                )
                             }
 
                     return EventSourceResponse(event_generator())
@@ -273,7 +287,7 @@ class A2AServer:
                         error=MethodNotFoundError(),
                     )
                     return JSONResponse(
-                        error.model_dump(exclude_none=True), status_code=400
+                        error.model_dump(exclude_none=True, mode="json"), status_code=400
                     )
 
             except json.JSONDecodeError as e:
@@ -282,7 +296,7 @@ class A2AServer:
                 logger.error(f"Error document: {e.doc}")
                 error = JSONRPCErrorResponse(id=None, error=JSONParseError())
                 return JSONResponse(
-                    error.model_dump(exclude_none=True), status_code=400
+                    error.model_dump(exclude_none=True, mode="json"), status_code=400
                 )
 
             except ValidationError as e:
@@ -294,7 +308,7 @@ class A2AServer:
                     id=None, error=InvalidRequestError(data=e.errors())
                 )
                 return JSONResponse(
-                    error.model_dump(exclude_none=True), status_code=400
+                    error.model_dump(exclude_none=True, mode="json"), status_code=400
                 )
 
             except Exception as e:
@@ -304,7 +318,7 @@ class A2AServer:
                     error=InternalError(),
                 )
                 return JSONResponse(
-                    error.model_dump(exclude_none=True), status_code=500
+                    error.model_dump(exclude_none=True, mode="json"), status_code=500
                 )
 
         return process_jsonrpc_request
@@ -322,7 +336,7 @@ class A2AServer:
         logger.debug("Handling list_agents request")
         agents = self.agent_registry.list_agents()
         logger.debug(f"Found {len(agents)} agents")
-        return JSONResponse([agent.model_dump() for agent in agents])
+        return JSONResponse([agent.model_dump(mode="json") for agent in agents])
 
     def start(self):
         """Start the A2A server"""

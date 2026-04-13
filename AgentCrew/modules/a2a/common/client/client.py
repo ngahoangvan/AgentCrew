@@ -76,7 +76,7 @@ class A2AClient:
                 client,
                 "POST",
                 self.url,
-                json=request.model_dump(),
+                json=request.model_dump(mode="json"),
                 headers=request_headers,
             ) as event_source:
                 try:
@@ -96,7 +96,7 @@ class A2AClient:
                 # Image generation could take time, adding timeout
                 response = await client.post(
                     self.url,
-                    json=request.root.model_dump(),
+                    json=request.root.model_dump(mode="json"),
                     timeout=self.timeout,
                     headers=request_headers,
                 )
@@ -146,7 +146,7 @@ class A2AClient:
                 client,
                 "POST",
                 self.url,
-                json=request.model_dump(),
+                json=request.model_dump(mode="json"),
                 headers=request_headers,
             ) as event_source:
                 try:
