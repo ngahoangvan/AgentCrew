@@ -1,6 +1,7 @@
 from typing import Dict, Optional, Callable
 from AgentCrew.modules.llm.base import BaseLLMService
 from AgentCrew.modules.llm.model_registry import ModelRegistry
+from loguru import logger
 import os
 
 
@@ -138,8 +139,8 @@ class ServiceManager:
                 # We are interested in 'openai_compatible' type for CustomLLMService
                 if name and provider_config.get("type") == "openai_compatible":
                     if not provider_config.get("api_base_url"):
-                        print(
-                            f"Warning: Custom provider '{name}' is missing 'api_base_url' and will be skipped."
+                        logger.warning(
+                            f"Custom provider '{name}' is missing 'api_base_url' and will be skipped."
                         )
                         continue
                     self.custom_provider_details[name] = {
@@ -148,7 +149,9 @@ class ServiceManager:
                         "extra_headers": provider_config.get("extra_headers", {}),
                     }
         except Exception as e:
-            print(f"Error loading custom LLM provider configurations for services: {e}")
+            logger.warning(
+                f"Error loading custom LLM provider configurations for services: {e}"
+            )
 
     def initialize_standalone_service(self, provider: str) -> BaseLLMService:
         """

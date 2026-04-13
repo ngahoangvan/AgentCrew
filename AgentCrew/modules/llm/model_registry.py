@@ -67,18 +67,20 @@ class ModelRegistry:
                         if provider_name:
                             model_data_dict["provider"] = provider_name
                         else:
-                            print(
-                                f"Warning: Skipping model due to missing provider name in config: ID '{model_data_dict.get('id', 'N/A')}'"
+                            logger.warning(
+                                f"Skipping model due to missing provider name in config: ID '{model_data_dict.get('id', 'N/A')}'"
                             )
                             continue
                         model = Model(**model_data_dict)
                         self.register_model(model)
                     except Exception as e:
-                        print(
+                        logger.warning(
                             f"Error loading custom model '{model_data_dict.get('id')}' for provider '{provider_name}': {e}"
                         )
         except Exception as e:
-            print(f"Error loading custom LLM providers configuration for models: {e}")
+            logger.warning(
+                f"Error loading custom LLM providers configuration for models: {e}"
+            )
 
     def _initialize_models(self):
         """Initialize the registry with default and custom models."""

@@ -7,6 +7,7 @@ import nest_asyncio
 from typing import Optional, Dict, Any, List
 
 import click
+from loguru import logger
 
 from AgentCrew.setup import ApplicationSetup, PROVIDER_LIST
 from AgentCrew.modules.config import ConfigManagement
@@ -103,9 +104,7 @@ class AgentCrewApplication:
             )
             ui.start()
         except Exception as e:
-            import traceback
-
-            print(traceback.format_exc())
+            logger.exception("Failed to run console mode")
             click.echo(f"❌ Error: {str(e)}", err=True)
         finally:
             MCPSessionManager.get_instance().cleanup()
@@ -155,9 +154,7 @@ class AgentCrewApplication:
             chat_window.show()
             sys.exit(app.exec())
         except Exception as e:
-            import traceback
-
-            print(traceback.format_exc())
+            logger.exception("Failed to run GUI mode")
             click.echo(f"❌ Error: {str(e)}", err=True)
         finally:
             MCPSessionManager.get_instance().cleanup()
@@ -222,9 +219,7 @@ class AgentCrewApplication:
             )
             server.start()
         except Exception as e:
-            import traceback
-
-            print(traceback.format_exc())
+            logger.exception("Failed to run A2A server")
             click.echo(f"❌ Error: {str(e)}", err=True)
         finally:
             MCPSessionManager.get_instance().cleanup()
@@ -338,7 +333,7 @@ class AgentCrewApplication:
 
             self.agent_manager.update_llm_service(llm_service)
 
-            for local_agent in self.agent_manager.agents:
+            for local_agent in self.agent_manager.agents.values():
                 if isinstance(local_agent, LocalAgent):
                     local_agent.is_remoting_mode = True
 
@@ -444,9 +439,7 @@ class AgentCrewApplication:
                 raise ValueError(f"Agent '{agent}' not found")
 
         except Exception:
-            import traceback
-
-            print(traceback.format_exc())
+            logger.exception("Failed to run job")
             raise
 
     def login(self) -> bool:

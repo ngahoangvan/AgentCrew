@@ -6,6 +6,7 @@ from typing import Optional, Dict, Any
 
 import click
 import requests
+from loguru import logger
 
 from AgentCrew.modules.config import ConfigManagement
 from AgentCrew.modules.config.global_config import GlobalConfig
@@ -112,7 +113,7 @@ class ApplicationSetup:
                             OpenAICodexOAuth,
                         )
 
-                        if OpenAICodexOAuth().has_valid_tokens:
+                        if OpenAICodexOAuth().has_valid_tokens():
                             return last_provider
                     elif os.getenv(api_key_map.get(last_provider, "")):
                         return last_provider
@@ -121,6 +122,7 @@ class ApplicationSetup:
                     if any(p["name"] == last_provider for p in custom_providers):
                         return last_provider
         except Exception as e:
+            logger.warning(f"Could not restore last used provider: {e}")
             click.echo(f"\u26a0\ufe0f  Could not restore last used provider: {e}")
 
         if os.getenv("GITHUB_COPILOT_API_KEY"):
@@ -171,6 +173,7 @@ class ApplicationSetup:
                     )
                     llm_service.model = last_model_class.id
         except Exception as e:
+            logger.warning(f"Could not restore last used model: {e}")
             click.echo(f"\u26a0\ufe0f  Could not restore last used model: {e}")
 
         memory_service = None
@@ -336,8 +339,14 @@ tools = ["memory", "browser", "web_search", "code_analysis"]
                         agent_def.get("base_url"),
                         headers=agent_def.get("headers", {}),
                     )
-                except Exception:
-                    print("Error: cannot connect to remote agent, skipping...")
+                except Exception as e:
+                    logger.warning(
+                        f"Cannot connect to remote agent '{agent_def['name']}', skipping: {e}"
+                    )
+                    click.echo(
+                        f"⚠️  Cannot connect to remote agent '{agent_def['name']}', skipping.",
+                        err=True,
+                    )
                     continue
             else:
                 if remoting_provider:
