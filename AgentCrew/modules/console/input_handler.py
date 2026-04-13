@@ -317,6 +317,7 @@ class InputHandler:
             HTML(f"<ansiblue>{prompt_message}</ansiblue> "),
             default=default,
             key_bindings=kb,
+            multiline=True,
             completer=ChatCompleter(self.message_handler),
         )
 

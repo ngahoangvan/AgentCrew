@@ -230,7 +230,7 @@ class ConsoleUI(Observer):
                 asyncio.run(self.message_handler.approve_pending_evolution())
             elif choice == "edit":
                 edited_summary = self.input_handler.get_prompt_input(
-                    "Edit approved summary:",
+                    "Edit approved summary(Alt+Enter to submit):",
                     default=data.get("approved_summary", ""),
                 )
                 if edited_summary.strip():

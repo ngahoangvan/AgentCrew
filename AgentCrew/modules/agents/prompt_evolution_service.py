@@ -101,7 +101,7 @@ Return ONLY valid JSON:
 {approved_summary}
 </approved_summary>
 
-Output ONLY the complete revised system prompt. No commentary, no explanation, no markdown wrapping."""
+Output ONLY the complete revised system prompt. No commentary, no explanation, no markdown wrapping, no current_system_prompt tags warning."""
 
     PROJECT_SPECIFIC_PATTERNS = [
         re.compile(r"(tests?/|src/|lib/|modules/|components/)[^\s]+", re.I),
