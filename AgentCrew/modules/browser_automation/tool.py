@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
-import difflib
-import time
 
 if TYPE_CHECKING:
     from .service import BrowserAutomationService
@@ -242,12 +240,10 @@ def get_browser_mouse_action_tool_handler(
         if action == "click":
             result = browser_service.click_element(element_uuid)
             if result.get("success", True):
-                diff_summary = _get_content_delta_changes(browser_service)
                 return (
                     f"{result.get('message', 'Success')}. Call `get_browser_content` tool to inspect the updated page state and current element mappings.\n"
                     f"Action: {action}\nUUID: {element_uuid}\n"
-                    f"ClickedElement: {result.get('elementInfo', {}).get('text', 'Unknown')}.\n"
-                    f"Content delta changes:\n{diff_summary}"
+                    f"ClickedElement: {result.get('elementInfo', {}).get('text', 'Unknown')}."
                 )
             raise RuntimeError(
                 f"Mouse action failed: {result['error']}\nAction: {action}\nUUID: {element_uuid}.\nCall `get_browser_content` tool to refresh the page state and inspect current element mappings."
@@ -351,11 +347,10 @@ def get_browser_keyboard_action_tool_handler(
 
             result = browser_service.input_data(element_uuid, str(value))
             if result.get("success", True):
-                diff_summary = _get_content_delta_changes(browser_service)
                 return (
                     f"{result.get('message', 'Success')}\n"
                     f"Action: {action}\nUUID: {element_uuid}\nValue: {value}\n"
-                    f"Content delta changes:\n{diff_summary}"
+                    "Call `get_browser_content` tool to inspect the updated page state and current element mappings."
                 )
             raise RuntimeError(
                 f"Keyboard action failed: {result['error']}\n"
@@ -378,13 +373,10 @@ def get_browser_keyboard_action_tool_handler(
                     if result.get("modifiers")
                     else ""
                 )
-                diff_summary = _get_content_delta_changes(browser_service)
-                success_msg = (
-                    f"{result.get('message', 'Success')}. Action: {action}. {key_info}\n"
-                    f"Content delta changes:\n{diff_summary}"
-                )
+                success_msg = f"{result.get('message', 'Success')}. Action: {action}. {key_info}"
                 if modifiers_info:
                     success_msg += f". {modifiers_info}"
+                success_msg += "\nCall `get_browser_content` tool to inspect the updated page state and current element mappings."
                 return success_msg
             raise RuntimeError(
                 f"Keyboard action failed: {result.get('error', 'Unknown error')}\n"
@@ -513,24 +505,6 @@ def get_browser_refresh_tool_handler(
 
     return handle_browser_refresh
 
-
-def _get_content_delta_changes(browser_service: BrowserAutomationService):
-    time.sleep(1)  # wait for page to stabilize
-    current_content = browser_service.get_page_content()
-    differ = difflib.Differ()
-    _last_page_content_lines = browser_service._last_page_content.splitlines()
-    try:
-        cutoff_idx = _last_page_content_lines.index("## Clickable Elements")
-    except ValueError:
-        cutoff_idx = len(_last_page_content_lines)
-    diffs = list(
-        differ.compare(
-            _last_page_content_lines[:cutoff_idx],
-            current_content.get("content", "").splitlines(),
-        )
-    )
-    diff_summary = "\n".join([d.lstrip("+- ") for d in diffs if d.startswith("+ ")])
-    return diff_summary
 
 
 def get_browser_execute_script_tool_definition(provider="claude") -> Dict[str, Any]:
