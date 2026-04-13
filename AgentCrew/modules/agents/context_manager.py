@@ -164,7 +164,7 @@ Apply matching behaviors from <Adaptive_Behaviors> immediately, overriding defau
             .get("text", "")
             .find("<Transfer_Tool>")
             != 0
-            or final_messages[last_user_index]["content"][0]
+            and final_messages[last_user_index]["content"][0]
             .get("text", "")
             .find("<Transfer_Post_Action_Reminder>")
             != 0
