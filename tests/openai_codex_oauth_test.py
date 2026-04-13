@@ -1,7 +1,7 @@
 import base64
 import json
 import time
-from datetime import datetime, timezone
+from datetime import datetime
 
 from AgentCrew.modules.openai_codex.oauth import OpenAICodexOAuth
 

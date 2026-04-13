@@ -128,7 +128,9 @@ class TestPromptEvolutionService(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["agent_name"], "Engineer")
         self.persistence_service.store_prompt_evolution.assert_called_once()
 
-    def test_apply_prompt_revision_records_generated_and_approved_summaries_separately(self):
+    def test_apply_prompt_revision_records_generated_and_approved_summaries_separately(
+        self,
+    ):
         self.service.agents_config = MagicMock()
         self.service.agents_config.update_agent_system_prompt.return_value = True
         result = self.service.apply_prompt_revision(

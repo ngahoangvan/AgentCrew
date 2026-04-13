@@ -373,7 +373,9 @@ def get_browser_keyboard_action_tool_handler(
                     if result.get("modifiers")
                     else ""
                 )
-                success_msg = f"{result.get('message', 'Success')}. Action: {action}. {key_info}"
+                success_msg = (
+                    f"{result.get('message', 'Success')}. Action: {action}. {key_info}"
+                )
                 if modifiers_info:
                     success_msg += f". {modifiers_info}"
                 success_msg += "\nCall `get_browser_content` tool to inspect the updated page state and current element mappings."
@@ -504,7 +506,6 @@ def get_browser_refresh_tool_handler(
             )
 
     return handle_browser_refresh
-
 
 
 def get_browser_execute_script_tool_definition(provider="claude") -> Dict[str, Any]:
