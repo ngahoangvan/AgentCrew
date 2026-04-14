@@ -3,6 +3,10 @@ from typing import Dict, Any, Callable
 from AgentCrew.modules.agents import AgentManager
 
 
+def _should_defer_post_action(post_action: str) -> bool:
+    return "transfer" in post_action.casefold()
+
+
 def get_transfer_tool_definition(provider="claude") -> Dict[str, Any]:
     """
     Get the definition for the transfer tool.
@@ -113,7 +117,10 @@ def get_transfer_tool_handler(agent_manager: AgentManager) -> Callable:
                 response += f"  <Shared_Context>    \n{'    \n'.join(result['transfer'].get('included_conversations', []))}\n  </Shared_Context>\n"
 
             if post_action:
-                agent_manager.defered_transfer = post_action
+                if _should_defer_post_action(post_action):
+                    agent_manager.defered_transfer = post_action
+                else:
+                    response += f"  <Post_Action>{post_action}</Post_Action>\n"
 
             response += "</Transfer_Tool>"
 
