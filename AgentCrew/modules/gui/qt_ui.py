@@ -1,5 +1,6 @@
 from __future__ import annotations
 import os
+from dataclasses import dataclass
 from typing import Any, Optional
 
 from PySide6.QtWidgets import (
@@ -40,6 +41,25 @@ if TYPE_CHECKING:
     from .widgets import TokenUsageWidget
 
 
+@dataclass
+class BubbleState:
+    current_response_bubble: Optional["MessageBubble"] = None
+    current_response_container: Optional[QWidget] = None
+    current_user_bubble: Optional["MessageBubble"] = None
+    current_thinking_bubble: Optional["MessageBubble"] = None
+    current_planning_widget: Optional[SystemMessageWidget] = None
+    current_file_bubble: Optional["MessageBubble"] = None
+
+
+@dataclass
+class StreamState:
+    current_planning_content: str = ""
+    processing_plan: bool = False
+    thinking_content: str = ""
+    expecting_response: bool = False
+    delegated_user_input: Optional[str] = None
+
+
 class ChatWindow(QMainWindow, Observer):
     # Signal for thread-safe event handling
     event_received = Signal(str, object)
@@ -58,11 +78,8 @@ class ChatWindow(QMainWindow, Observer):
     # Custom Widgets
     token_usage: TokenUsageWidget
 
-    current_response_bubble: Optional[MessageBubble]
-    current_response_container: Optional[QWidget]
-    current_user_bubble: Optional[MessageBubble]
-    current_thinking_bubble: Optional[MessageBubble]
-    current_planning_widget: Optional[SystemMessageWidget]
+    bubble_state: BubbleState
+    stream_state: StreamState
 
     def __init__(self, message_handler: MessageHandler):
         from .widgets import ConversationSidebar
@@ -189,18 +206,8 @@ class ChatWindow(QMainWindow, Observer):
         self.history_position = len(self.message_handler.history_manager.history)
         self.message_input.setFocus()
 
-        # Track current response bubble for chunked responses
-        self.current_response_bubble = None
-        self.current_user_bubble = None
-        self.current_response_container = None
-        self.current_thinking_bubble = None
-        self.current_planning_widget = None
-        self.current_planning_content = ""
-        self.processing_plan = False
-        self.current_file_bubble = None
-        self.thinking_content = ""
-        self.expecting_response = False
-        self._delegated_user_input = None
+        self.bubble_state = BubbleState()
+        self.stream_state = StreamState()
 
         # Track session cost
         self.session_cost = 0.0
@@ -215,6 +222,12 @@ class ChatWindow(QMainWindow, Observer):
         self.chat_components.add_system_message(
             "Press Ctrl+Enter to send, Ctrl+Shift+C to copy, Ctrl+L to clear chat."
         )
+
+    def reset_bubble_state(self, **overrides):
+        self.bubble_state = BubbleState(**overrides)
+
+    def reset_stream_state(self, **overrides):
+        self.stream_state = StreamState(**overrides)
 
     def _setup_components(self):
         """Initialize all component handlers."""
@@ -322,7 +335,7 @@ class ChatWindow(QMainWindow, Observer):
         self.status_bar.showMessage(
             f"Error: {error_message}", 5000
         )  # Display error in status bar
-        self.expecting_response = False
+        self.stream_state.expecting_response = False
 
     @Slot(str)
     def display_status_message(self, message):
@@ -522,8 +535,8 @@ class ChatWindow(QMainWindow, Observer):
 
         if event in message_events:
             # make sure file bubble is cleared if we are processing a new message
-            if self.current_file_bubble:
-                self.current_file_bubble = None
+            if self.bubble_state.current_file_bubble:
+                self.bubble_state.current_file_bubble = None
             self.message_event_handler.handle_event(event, data)
         elif event in tool_events:
             self.tool_event_handler.handle_event(event, data)
@@ -533,9 +546,9 @@ class ChatWindow(QMainWindow, Observer):
             # If an error occurs during LLM processing, ensure loading flag is false
             self.loading_conversation = False
             self.ui_state_manager.set_input_controls_enabled(True)
-            if self.current_file_bubble:
-                self.chat_components.remove_messages_after(self.current_file_bubble)
-                self.current_file_bubble = None
+            if self.bubble_state.current_file_bubble:
+                self.chat_components.remove_messages_after(self.bubble_state.current_file_bubble)
+                self.bubble_state.current_file_bubble = None
             self.display_error(data)
         elif event == "consolidation_completed":
             self.conversation_components.display_consolidation(data)
@@ -545,7 +558,7 @@ class ChatWindow(QMainWindow, Observer):
             self.ui_state_manager.set_input_controls_enabled(True)
         elif event == "file_processing":
             file_path = data["file_path"]
-            self.current_file_bubble = self.chat_components.append_file(
+            self.bubble_state.current_file_bubble = self.chat_components.append_file(
                 file_path, is_user=True
             )
             if not self.loading_conversation:
@@ -555,7 +568,7 @@ class ChatWindow(QMainWindow, Observer):
             file_path = data.get("file_path")
             if file_path:
                 self.chat_components.mark_file_processed(file_path)
-            self.current_file_bubble = None
+            self.bubble_state.current_file_bubble = None
         elif event == "image_generated":
             self.chat_components.append_file(data, False, True)
         # Command-related events are now handled by command_handler above
@@ -612,12 +625,8 @@ class ChatWindow(QMainWindow, Observer):
         )  # True = user message
 
         # Set flag to expect a response (for chunking)
-        self.expecting_response = True
-        self.current_response_bubble = None
-        self.current_response_container = None
-        self.current_planning_widget = None
-        self.current_planning_content = ""
-        self.processing_plan = False
+        self.reset_bubble_state(current_user_bubble=self.bubble_state.current_user_bubble)
+        self.reset_stream_state(expecting_response=True)
 
     def _handle_theme_changed(self, theme_name):
         """

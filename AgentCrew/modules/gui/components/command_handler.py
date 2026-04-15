@@ -406,8 +406,8 @@ class CommandHandler:
         #     self.chat_window.status_indicator.setText(
         #         f"Agent: {data} | Model: {self.chat_window.message_handler.agent.get_model()}"
         #     )
-        #     self.chat_window.current_response_bubble = None
-        #     self.chat_window.current_response_container = None
+        #     self.chat_window.bubble_state.current_response_bubble = None
+        #     self.chat_window.bubble_state.current_response_container = None
         #     return True
 
         elif event == "think_budget_set":

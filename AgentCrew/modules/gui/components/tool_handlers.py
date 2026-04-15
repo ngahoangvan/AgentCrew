@@ -126,10 +126,10 @@ class ToolEventHandler:
 
             # Add to chat using convenience method
             self.chat_window.chat_components.add_tool_widget(tool_widget)
-        self.chat_window.current_response_bubble = None
-        self.chat_window.current_response_container = None
-        self.chat_window.current_thinking_bubble = None
-        self.chat_window.thinking_content = ""
+        self.chat_window.bubble_state.current_response_bubble = None
+        self.chat_window.bubble_state.current_response_container = None
+        self.chat_window.bubble_state.current_thinking_bubble = None
+        self.chat_window.stream_state.thinking_content = ""
 
         # Reset the current response bubble so the next agent message starts in a new bubble
 
@@ -152,8 +152,8 @@ class ToolEventHandler:
         self.chat_window.display_status_message(f"Error in tool {tool_use['name']}")
 
         # Reset the current response bubble so the next agent message starts in a new bubble
-        self.chat_window.current_response_bubble = None
-        self.chat_window.current_response_container = None
+        self.chat_window.bubble_state.current_response_bubble = None
+        self.chat_window.bubble_state.current_response_container = None
 
     def handle_tool_confirmation_required(self, tool_info):
         """Display a dialog for tool confirmation request."""
@@ -291,8 +291,8 @@ class ToolEventHandler:
             f"Tool execution rejected: {data['message']}"
         )
 
-        self.chat_window.current_response_bubble = None
-        self.chat_window.current_response_container = None
+        self.chat_window.bubble_state.current_response_bubble = None
+        self.chat_window.bubble_state.current_response_container = None
 
     def _handle_write_or_edit_file_confirmation(self, tool_use, confirmation_id):
         """Handle write_or_edit_file tool confirmation with diff view."""

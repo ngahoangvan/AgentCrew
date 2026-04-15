@@ -230,10 +230,10 @@ class ChatComponents:
 
         # If this is an assistant message, store references for potential future chunks
         if not is_user:
-            self.chat_window.current_response_bubble = message_bubble
-            self.chat_window.current_response_container = container
+            self.chat_window.bubble_state.current_response_bubble = message_bubble
+            self.chat_window.bubble_state.current_response_container = container
         else:
-            self.chat_window.current_user_bubble = message_bubble
+            self.chat_window.bubble_state.current_user_bubble = message_bubble
 
         # Process events to ensure UI updates immediately
         if not self.chat_window.loading_conversation:
@@ -317,10 +317,10 @@ class ChatComponents:
     def clear_chat_ui(self):
         """Clear only the chat message widgets from the UI."""
         # Stop any active streaming before clearing
-        if self.chat_window.current_response_bubble:
-            self.chat_window.current_response_bubble.stop_streaming()
-        if self.chat_window.current_thinking_bubble:
-            self.chat_window.current_thinking_bubble.stop_streaming()
+        if self.chat_window.bubble_state.current_response_bubble:
+            self.chat_window.bubble_state.current_response_bubble.stop_streaming()
+        if self.chat_window.bubble_state.current_thinking_bubble:
+            self.chat_window.bubble_state.current_thinking_bubble.stop_streaming()
 
         while self.chat_window.chat_layout.count():
             item = self.chat_window.chat_layout.takeAt(0)
@@ -328,13 +328,10 @@ class ChatComponents:
             if widget:
                 widget.deleteLater()
         # Reset tracking variables related to response streaming
-        self.chat_window.current_response_bubble = None
-        self.chat_window.current_response_container = None
-        self.chat_window.current_thinking_bubble = None
-        self.chat_window.current_planning_widget = None
-        self.chat_window.current_planning_content = ""
-        self.chat_window.thinking_content = ""
-        self.chat_window.expecting_response = False
+        current_file_bubble = self.chat_window.bubble_state.current_file_bubble
+        delegated_user_input = self.chat_window.stream_state.delegated_user_input
+        self.chat_window.reset_bubble_state(current_file_bubble=current_file_bubble)
+        self.chat_window.reset_stream_state(delegated_user_input=delegated_user_input)
 
     def remove_messages_after(self, message_bubble):
         """Remove all message widgets that appear after the given message bubble."""
@@ -358,9 +355,9 @@ class ChatComponents:
                 item.widget().deleteLater()
 
         # Reset current response tracking
-        self.chat_window.current_response_bubble = None
-        self.chat_window.current_response_container = None
-        self.chat_window.expecting_response = False
+        self.chat_window.bubble_state.current_response_bubble = None
+        self.chat_window.bubble_state.current_response_container = None
+        self.chat_window.stream_state.expecting_response = False
 
     def _handle_file_remove(self, message_bubble):
         """Handle removal of a file from the processing queue."""
