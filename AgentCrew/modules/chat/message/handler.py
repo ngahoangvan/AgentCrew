@@ -274,6 +274,94 @@ class MessageHandler(Observable):
             session.loop.call_soon_threadsafe(session.task.cancel)
         return True
 
+    def _get_messages_for_current_turn(self) -> List[dict]:
+        if self.last_assisstant_response_idx >= 0:
+            return self.get_recent_agent_responses()
+        if self.current_user_input_idx >= 0:
+            return self.streamline_messages[self.current_user_input_idx + 1 :]
+        return []
+
+    def _extract_user_text(self, user_message: dict) -> str:
+        user_input = ""
+        content = user_message.get("content", "")
+        if isinstance(content, list):
+            for content_item in content:
+                if content_item.get("type") == "text":
+                    user_input += content_item.get("text", "")
+        elif isinstance(content, str):
+            user_input = content
+        return user_input
+
+    def _finalize_current_turn(
+        self,
+        assistant_response: str,
+        input_tokens: int,
+        output_tokens: int,
+        *,
+        store_memory: bool,
+        emit_response_completed: bool,
+    ) -> List[dict]:
+        if assistant_response.strip():
+            self._messages_append(
+                self.agent.format_message(
+                    MessageType.Assistant, {"message": assistant_response}
+                )
+            )
+
+        if emit_response_completed:
+            self._notify("response_completed", assistant_response)
+
+        messages_for_this_turn = self._get_messages_for_current_turn()
+
+        if self.current_conversation_id and messages_for_this_turn:
+            try:
+                if self.persistent_service:
+                    metadata = {
+                        "input_tokens": input_tokens,
+                        "output_tokens": output_tokens,
+                        "total_tokens": input_tokens + output_tokens,
+                    }
+                    self.persistent_service.store_conversation_metadata(
+                        self.current_conversation_id, metadata
+                    )
+
+                    self.persistent_service.append_conversation_messages(
+                        self.current_conversation_id,
+                        messages_for_this_turn,
+                    )
+                    self._notify(
+                        "conversation_saved", {"id": self.current_conversation_id}
+                    )
+            except Exception as e:
+                error_message = f"Failed to save conversation turn to {self.current_conversation_id}: {str(e)}"
+                logger.error(f"ERROR: {error_message}")
+                self._notify("error", {"message": error_message})
+
+        if self.current_user_input and self.current_user_input_idx >= 0:
+            self.conversation_manager.store_conversation_turn(
+                self.current_user_input, self.current_user_input_idx
+            )
+            if store_memory and self.memory_service:
+                assistant_messages = self._extract_assistant_messages_for_memory(
+                    messages_for_this_turn
+                )
+
+                try:
+                    self.memory_service.store_conversation(
+                        self._extract_user_text(self.current_user_input),
+                        assistant_messages,
+                        self.agent.name,
+                    )
+                except Exception as e:
+                    self._notify(
+                        "error", f"Failed to store conversation in memory: {str(e)}"
+                    )
+            self.current_user_input = None
+            self.current_user_input_idx = -1
+
+        self.last_assisstant_response_idx = len(self.streamline_messages)
+        return messages_for_this_turn
+
     async def _run_stream_response(
         self,
         session: StreamSession,
@@ -351,6 +439,13 @@ class MessageHandler(Observable):
                     self._notify("streaming_stopped", assistant_response)
                     session.finalize("canceled")
                     await self.stream_generator.aclose()
+                    self._finalize_current_turn(
+                        assistant_response,
+                        input_tokens,
+                        output_tokens,
+                        store_memory=False,
+                        emit_response_completed=bool(assistant_response.strip()),
+                    )
                     self._notify(
                         "stream_canceled",
                         {
@@ -493,85 +588,13 @@ class MessageHandler(Observable):
 
                 return await self.get_assistant_response()
 
-            # Add assistant response to messages
-            if assistant_response.strip():
-                self._messages_append(
-                    self.agent.format_message(
-                        MessageType.Assistant, {"message": assistant_response}
-                    )
-                )
-            # Final assistant message
-            self._notify("response_completed", assistant_response)
-
-            messages_for_this_turn = []
-            if self.last_assisstant_response_idx >= 0:
-                messages_for_this_turn = self.get_recent_agent_responses()
-            elif self.current_user_input_idx >= 0:
-                messages_for_this_turn = self.streamline_messages[
-                    self.current_user_input_idx + 1 :
-                ]
-
-            if self.current_conversation_id and messages_for_this_turn:
-                try:
-                    if self.persistent_service:
-                        metadata = {
-                            "input_tokens": input_tokens,
-                            "output_tokens": output_tokens,
-                            "total_tokens": input_tokens + output_tokens,
-                        }
-                        self.persistent_service.store_conversation_metadata(
-                            self.current_conversation_id, metadata
-                        )
-
-                        self.persistent_service.append_conversation_messages(
-                            self.current_conversation_id,
-                            messages_for_this_turn,
-                        )
-                        self._notify(
-                            "conversation_saved", {"id": self.current_conversation_id}
-                        )
-                except Exception as e:
-                    error_message = f"Failed to save conversation turn to {self.current_conversation_id}: {str(e)}"
-                    logger.error(f"ERROR: {error_message}")
-                    self._notify("error", {"message": error_message})
-
-            if self.current_user_input and self.current_user_input_idx >= 0:
-                self.conversation_manager.store_conversation_turn(
-                    self.current_user_input, self.current_user_input_idx
-                )
-                if self.memory_service:
-                    user_input = ""
-                    user_message = self.current_user_input  # Get the user message
-                    if (
-                        isinstance(user_message["content"], list)
-                        and len(user_message["content"]) > 0
-                    ):
-                        for content_item in user_message["content"]:
-                            if content_item.get("type") == "text":
-                                user_input += content_item.get("text", "")
-                    elif isinstance(user_message["content"], str):
-                        user_input = user_message["content"]
-
-                    assistant_messages = self._extract_assistant_messages_for_memory(
-                        messages_for_this_turn
-                    )
-
-                    try:
-                        self.memory_service.store_conversation(
-                            user_input,
-                            assistant_messages,
-                            self.agent.name,
-                        )
-                    except Exception as e:
-                        self._notify(
-                            "error", f"Failed to store conversation in memory: {str(e)}"
-                        )
-                # Store the conversation turn reference for /jump command
-                self.current_user_input = None
-                self.current_user_input_idx = -1
-
-            self.last_assisstant_response_idx = len(self.streamline_messages)
-            # --- End of Persistence Logic ---
+            self._finalize_current_turn(
+                assistant_response,
+                input_tokens,
+                output_tokens,
+                store_memory=True,
+                emit_response_completed=True,
+            )
 
             if self.agent_manager.defered_transfer:
                 self.agent.history.append(
@@ -599,6 +622,13 @@ class MessageHandler(Observable):
                     pass
             if not session.finished.is_set():
                 session.finalize("canceled")
+            self._finalize_current_turn(
+                assistant_response,
+                input_tokens,
+                output_tokens,
+                store_memory=False,
+                emit_response_completed=bool(assistant_response.strip()),
+            )
             self._notify(
                 "stream_canceled",
                 {
