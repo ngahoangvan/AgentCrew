@@ -134,7 +134,9 @@ class ConversationSidebar(QWidget):
         # Assuming timestamp is sortable (e.g., ISO format string or datetime object)
 
         for metadata in self._conversations:
-            title = metadata.get("preview", "Untitled Conversation")
+            title = metadata.get("title") or metadata.get(
+                "preview", "Untitled Conversation"
+            )
             timestamp = metadata.get("timestamp", "N/A")
             conv_id = metadata.get("id", "N/A")
 

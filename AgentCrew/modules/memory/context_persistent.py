@@ -252,9 +252,18 @@ class ContextPersistenceService:
 
         self._write_json_file(file_path, history)
 
+        metadata = self.get_conversation_metadata(conversation_id)
         preview = self._extract_preview(history)
+        metadata_updates = {}
         if preview != "Empty Conversation":
-            self.store_conversation_metadata(conversation_id, {"preview": preview})
+            metadata_updates["preview"] = preview
+
+        fork_title = self._extract_fork_title_from_history(history, metadata)
+        if fork_title:
+            metadata_updates["fork_title"] = fork_title
+
+        if metadata_updates:
+            self.store_conversation_metadata(conversation_id, metadata_updates)
 
     def get_conversation_history(
         self, conversation_id: str
@@ -345,6 +354,35 @@ class ContextPersistenceService:
 
         return metadata
 
+    def _extract_text_preview(self, content: Any, max_length: int = 50) -> str:
+        if isinstance(content, str) and content:
+            return (content[:max_length] + "...") if len(content) > max_length else content
+        if isinstance(content, list):
+            first_text_block = next(
+                (
+                    block.get("text", "")
+                    for block in content
+                    if isinstance(block, dict) and block.get("type") == "text"
+                ),
+                "",
+            )
+            if first_text_block:
+                return (
+                    (first_text_block[:max_length] + "...")
+                    if len(first_text_block) > max_length
+                    else first_text_block
+                )
+            return "[Image/Tool Data]"
+        return "[Non-text Content]"
+
+    def _resolve_conversation_title(self, metadata: Dict[str, Any], preview: str) -> str:
+        return metadata.get("fork_title") or preview
+
+    def _is_previewable_user_preview(self, preview: str) -> bool:
+        return not preview.startswith(
+            "Memories related to the user request:"
+        ) and not preview.startswith("Content of ")
+
     def _extract_preview(self, history: List[Dict[str, Any]]) -> str:
         """
         Extracts a preview string from a conversation history.
@@ -367,35 +405,27 @@ class ContextPersistenceService:
                 preview = "[No User Message Found]"
                 break
 
-            content = first_user_msg.get("content", "")
-            if isinstance(content, str) and content:
-                preview = (content[:50] + "...") if len(content) > 50 else content
-            elif isinstance(content, list):
-                first_text_block = next(
-                    (
-                        block.get("text", "")
-                        for block in content
-                        if isinstance(block, dict) and block.get("type") == "text"
-                    ),
-                    "",
-                )
-                if first_text_block:
-                    preview = (
-                        (first_text_block[:50] + "...")
-                        if len(first_text_block) > 50
-                        else first_text_block
-                    )
-                else:
-                    preview = "[Image/Tool Data]"
-            else:
-                preview = "[Non-text Content]"
-
-            if not preview.startswith(
-                "Memories related to the user request:"
-            ) and not preview.startswith("Content of "):
+            preview = self._extract_text_preview(first_user_msg.get("content", ""))
+            if self._is_previewable_user_preview(preview):
                 break
 
         return preview
+
+    def _extract_fork_title_from_history(
+        self, history: List[Dict[str, Any]], metadata: Dict[str, Any]
+    ) -> Optional[str]:
+        fork_point = metadata.get("fork_point")
+        if not isinstance(history, list) or not isinstance(fork_point, int) or fork_point < 0:
+            return None
+
+        for msg in history[fork_point:]:
+            if not isinstance(msg, dict) or msg.get("role") != "user":
+                continue
+            preview = self._extract_text_preview(msg.get("content", ""))
+            if self._is_previewable_user_preview(preview):
+                return preview
+
+        return None
 
     def list_conversations(self) -> List[Dict[str, Any]]:
         """
@@ -429,11 +459,13 @@ class ContextPersistenceService:
                             history = self._read_json_file(file_path, default_value=[])
                             preview = self._extract_preview(history)
 
+                        title = self._resolve_conversation_title(metadata, preview)
+
                         conversations.append(
                             {
                                 "id": conversation_id,
                                 "timestamp": timestamp,
-                                "title": preview,
+                                "title": title,
                                 "preview": preview,
                             }
                         )
@@ -721,6 +753,7 @@ class ContextPersistenceService:
                         history = self._read_json_file(file_path, default_value=[])
                         preview = self._extract_preview(history)
 
+                    title = self._resolve_conversation_title(metadata, preview)
                     parent_id = metadata.get("parent_id")
                     fork_children = metadata.get("fork_children", [])
 
@@ -728,7 +761,7 @@ class ContextPersistenceService:
                         {
                             "id": conversation_id,
                             "timestamp": timestamp,
-                            "title": preview,
+                            "title": title,
                             "preview": preview,
                             "is_fork": False,
                             "parent_id": parent_id,
