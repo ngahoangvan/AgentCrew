@@ -41,9 +41,13 @@ class MessageEventHandler:
         if not planning_content.strip():
             return
         if self.chat_window.current_planning_widget is None:
-            self.chat_window.current_planning_widget = (
-                self.chat_window.chat_components.add_planning_message(planning_content)
-            )
+            if not self.chat_window.processing_plan:
+                self.chat_window.current_planning_widget = (
+                    self.chat_window.chat_components.add_planning_message(
+                        planning_content
+                    )
+                )
+                self.chat_window.processing_plan = True
         else:
             self.chat_window.current_planning_widget.set_text(
                 f"🧭 Agent plan\n\n{planning_content}"
@@ -157,6 +161,7 @@ class MessageEventHandler:
             self.chat_window.current_thinking_bubble = None
         self.chat_window.current_planning_widget = None
         self.chat_window.current_planning_content = ""
+        self.processing_plan = False
         self.chat_window.display_status_message("Stream canceled.")
         self.chat_window.ui_state_manager.set_input_controls_enabled(True)
         QApplication.processEvents()
@@ -169,6 +174,7 @@ class MessageEventHandler:
             self.chat_window.current_thinking_bubble = None
         self.chat_window.current_planning_widget = None
         self.chat_window.current_planning_content = ""
+        self.processing_plan = False
         self.chat_window.display_status_message("Stream timed out before first chunk.")
         self.chat_window.ui_state_manager.set_input_controls_enabled(True)
         QApplication.processEvents()

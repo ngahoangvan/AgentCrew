@@ -22,6 +22,8 @@ from PySide6.QtGui import QIcon
 from AgentCrew.modules.chat.message_handler import Observer
 from loguru import logger
 
+from AgentCrew.modules.gui.widgets.system_message import SystemMessageWidget
+
 from .worker import LLMWorker
 from typing import TYPE_CHECKING
 
@@ -60,6 +62,7 @@ class ChatWindow(QMainWindow, Observer):
     current_response_container: Optional[QWidget]
     current_user_bubble: Optional[MessageBubble]
     current_thinking_bubble: Optional[MessageBubble]
+    current_planning_widget: Optional[SystemMessageWidget]
 
     def __init__(self, message_handler: MessageHandler):
         from .widgets import ConversationSidebar
@@ -193,6 +196,7 @@ class ChatWindow(QMainWindow, Observer):
         self.current_thinking_bubble = None
         self.current_planning_widget = None
         self.current_planning_content = ""
+        self.processing_plan = False
         self.current_file_bubble = None
         self.thinking_content = ""
         self.expecting_response = False
@@ -613,6 +617,7 @@ class ChatWindow(QMainWindow, Observer):
         self.current_response_container = None
         self.current_planning_widget = None
         self.current_planning_content = ""
+        self.processing_plan = False
 
     def _handle_theme_changed(self, theme_name):
         """
