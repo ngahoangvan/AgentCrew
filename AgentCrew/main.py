@@ -56,14 +56,24 @@ def cli_prod():
     if sys.argv[1] == "--version":
         click.echo(f"AgentCrew version: {get_current_version()}")
         exit(0)
-    os.environ["AGENTCREW_LOG_PATH"] = os.path.expanduser("~/.AgentCrew/logs")
-    os.environ["MEMORYDB_PATH"] = os.path.expanduser("~/.AgentCrew/memorydb")
-    os.environ["MCP_CONFIG_PATH"] = os.path.expanduser("~/.AgentCrew/mcp_servers.json")
-    os.environ["SW_AGENTS_CONFIG"] = os.path.expanduser("~/.AgentCrew/agents.toml")
-    os.environ["AGENTCREW_PERSISTENCE_DIR"] = os.path.expanduser(
-        "~/.AgentCrew/persistents"
+    os.environ["AGENTCREW_LOG_PATH"] = os.getenv(
+        "AGENTCREW_LOG_PATH", os.path.expanduser("~/.AgentCrew/logs")
     )
-    os.environ["AGENTCREW_CONFIG_PATH"] = os.path.expanduser("~/.AgentCrew/config.json")
+    os.environ["MEMORYDB_PATH"] = os.getenv(
+        "MEMORYDB_PATH", os.path.expanduser("~/.AgentCrew/memorydb")
+    )
+    os.environ["MCP_CONFIG_PATH"] = os.getenv(
+        "MCP_CONFIG_PATH", os.path.expanduser("~/.AgentCrew/mcp_servers.json")
+    )
+    os.environ["SW_AGENTS_CONFIG"] = os.getenv(
+        "SW_AGENTS_CONFIG", os.path.expanduser("~/.AgentCrew/agents.toml")
+    )
+    os.environ["AGENTCREW_PERSISTENCE_DIR"] = os.getenv(
+        "AGENTCREW_PERSISTENCE_DIR", os.path.expanduser("~/.AgentCrew/persistents")
+    )
+    os.environ["AGENTCREW_CONFIG_PATH"] = os.getenv(
+        "AGENTCREW_CONFIG_PATH", os.path.expanduser("~/.AgentCrew/config.json")
+    )
     os.environ["AGENTCREW_ENV"] = os.getenv("AGENTCREW_ENV", "production")
     os.environ["AGENTCREW_LOG_LEVEL"] = os.getenv("AGENTCREW_LOG_LEVEL", "ERROR")
     cli()
