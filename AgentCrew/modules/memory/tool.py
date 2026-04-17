@@ -198,7 +198,6 @@ def get_memory_retrieve_tool_handler(
         query = params.get("query", "").strip()
         from_date = params.get("from_date", None)
         to_date = params.get("to_date", None)
-        print(context.agent_name)
 
         if not memory_service:
             raise ValueError("Memory service not found")

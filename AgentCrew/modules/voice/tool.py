@@ -57,6 +57,7 @@ def speak_tool_prompt() -> str:
     - use it for normal replies to the user
     - use it for acknowledgements and progress updates
     - use it for guidance, answers, and conversational feedback
+    - use it for notify user when task completed
     - use normal chat text only when extra detail or structured content is needed
   </When_To_Use>
 
