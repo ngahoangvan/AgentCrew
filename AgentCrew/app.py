@@ -85,7 +85,9 @@ class AgentCrewApplication:
                         "No LLM API key found. Please set either ANTHROPIC_API_KEY, GEMINI_API_KEY, OPENAI_API_KEY, DEEPINFRA_API_KEY, or TOGETHER_API_KEY"
                     )
 
-            services = self.setup.setup_services(provider, memory_llm)
+            services = self.setup.setup_services(
+                provider, memory_llm, with_voice=with_voice
+            )
 
             if mcp_config:
                 os.environ["MCP_CONFIG_PATH"] = mcp_config
@@ -139,7 +141,9 @@ class AgentCrewApplication:
                     config_window.show()
                     sys.exit(app.exec())
 
-            services = self.setup.setup_services(provider, memory_llm)
+            services = self.setup.setup_services(
+                provider, memory_llm, with_voice=with_voice
+            )
 
             if mcp_config:
                 os.environ["MCP_CONFIG_PATH"] = mcp_config
@@ -320,7 +324,9 @@ class AgentCrewApplication:
                     )
 
             services = self.setup.setup_services(
-                provider, memory_llm, need_memory=False
+                provider,
+                memory_llm,
+                need_memory=False,
             )
 
             if mcp_config:

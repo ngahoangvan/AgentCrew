@@ -145,7 +145,11 @@ class ApplicationSetup:
         return None
 
     def setup_services(
-        self, provider: str, memory_llm: Optional[str] = None, need_memory: bool = True
+        self,
+        provider: str,
+        memory_llm: Optional[str] = None,
+        need_memory: bool = True,
+        with_voice: bool = False,
     ) -> Dict[str, Any]:
         registry = ModelRegistry.get_instance()
         llm_manager = ServiceManager.get_instance()
@@ -252,26 +256,25 @@ class ApplicationSetup:
             click.echo(f"\u26a0\ufe0f Skills service not available: {str(e)}")
             skills_service = None
 
-        try:
-            from AgentCrew.modules.voice import AUDIO_AVAILABLE
+        voice_service = None
+        if with_voice:
+            try:
+                from AgentCrew.modules.voice import AUDIO_AVAILABLE
 
-            if AUDIO_AVAILABLE and os.getenv("ELEVENLABS_API_KEY"):
-                from AgentCrew.modules.voice.elevenlabs_service import (
-                    ElevenLabsVoiceService,
-                )
+                if AUDIO_AVAILABLE and os.getenv("ELEVENLABS_API_KEY"):
+                    from AgentCrew.modules.voice.elevenlabs_service import (
+                        ElevenLabsVoiceService,
+                    )
 
-                voice_service = ElevenLabsVoiceService()
-            elif AUDIO_AVAILABLE and os.getenv("DEEPINFRA_API_KEY"):
-                from AgentCrew.modules.voice.deepinfra_service import (
-                    DeepInfraVoiceService,
-                )
+                    voice_service = ElevenLabsVoiceService()
+                elif AUDIO_AVAILABLE and os.getenv("DEEPINFRA_API_KEY"):
+                    from AgentCrew.modules.voice.deepinfra_service import (
+                        DeepInfraVoiceService,
+                    )
 
-                voice_service = DeepInfraVoiceService()
-            else:
-                voice_service = None
-        except Exception as e:
-            click.echo(f"\u26a0\ufe0f Voice service not available: {str(e)}")
-            voice_service = None
+                    voice_service = DeepInfraVoiceService()
+            except Exception as e:
+                click.echo(f"\u26a0\ufe0f Voice service not available: {str(e)}")
 
         self.services = {
             "llm": llm_service,
