@@ -99,7 +99,6 @@ class TextCleaner(BaseTextCleaner):
             self._speakable_colon_token,
             text,
         )
-        text = re.sub(r"(?<=\w)-(?=\w)", " dash ", text)
 
         # Apply replacements
         for pattern, replacement in self.replacements:
