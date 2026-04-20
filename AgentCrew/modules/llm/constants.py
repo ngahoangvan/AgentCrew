@@ -348,7 +348,12 @@ _DEEPINFRA_MODELS = [
         capabilities=["tool_use", "vision", "stream", "structured_output"],
         max_context_token=256_000,
         force_sample_params=SampleParam(
-            temperature=0.6, top_p=0.95, top_k=20, min_p=0.0
+            temperature=0.7,
+            top_p=0.8,
+            top_k=20,
+            min_p=0.0,
+            repetition_penalty=1,
+            presence_penalty=1.5,
         ),
         input_token_price_1m=0.2,
         output_token_price_1m=1.00,
@@ -373,7 +378,12 @@ _DEEPINFRA_MODELS = [
         capabilities=["tool_use", "vision", "stream", "structured_output"],
         max_context_token=256_000,
         force_sample_params=SampleParam(
-            temperature=0.6, top_p=0.95, top_k=20, min_p=0.0
+            temperature=0.7,
+            top_p=0.8,
+            top_k=20,
+            min_p=0.0,
+            repetition_penalty=1.0,
+            presence_penalty=1.5,
         ),
         input_token_price_1m=0.54,
         output_token_price_1m=3.40,
@@ -386,7 +396,7 @@ _DEEPINFRA_MODELS = [
         description="Qwen3 is the latest generation of large language models in Qwen series, offering a comprehensive suite of dense and mixture-of-experts (MoE) models",
         capabilities=["tool_use", "thinking", "stream", "structured_output"],
         force_sample_params=SampleParam(
-            temperature=0.6, top_p=0.95, top_k=20, min_p=0.0
+            temperature=0.6, top_p=0.95, top_k=20, min_p=0.0, repetition_penalty=1.0
         ),
         max_context_token=256_000,
         input_token_price_1m=1.2,
@@ -430,7 +440,12 @@ _DEEPINFRA_MODELS = [
         description="Qwen3.5 is the latest generation of large language models in Qwen series, offering a comprehensive suite of dense and mixture-of-experts (MoE) models",
         capabilities=["tool_use", "stream", "structured_output"],
         force_sample_params=SampleParam(
-            temperature=0.7, top_p=0.9, top_k=20, min_p=0.0
+            temperature=0.7,
+            top_p=0.8,
+            top_k=20,
+            min_p=0.0,
+            repetition_penalty=1.0,
+            presence_penalty=1.5,
         ),
         input_token_price_1m=0.26,
         output_token_price_1m=2.6,
