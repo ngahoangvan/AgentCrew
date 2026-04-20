@@ -77,7 +77,7 @@ wheels = [
 
 [[package]]
 name = "agentcrew-ai"
-version = "0.12.11"
+version = "0.12.12"
 source = { editable = "." }
 dependencies = [
     { name = "a2a-sdk" },
@@ -149,7 +149,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "a2a-sdk", specifier = ">=0.3.10" },
+    { name = "a2a-sdk", specifier = ">=0.3.10,<1.0.0" },
     { name = "anthropic" },
     { name = "chromadb", specifier = ">=1.0.0" },
     { name = "click" },

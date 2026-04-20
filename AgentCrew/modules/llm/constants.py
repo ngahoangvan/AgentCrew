@@ -341,6 +341,19 @@ _DEEPINFRA_MODELS = [
         output_token_price_1m=0.35,
     ),
     Model(
+        id="Qwen/Qwen3.6-35B-A3B",
+        provider="deepinfra",
+        name="Qwen 3.6",
+        description="Qwen3.6-35B-A3B is Alibaba's latest flagship Mixture-of-Experts model",
+        capabilities=["tool_use", "vision", "stream", "structured_output"],
+        max_context_token=256_000,
+        force_sample_params=SampleParam(
+            temperature=0.6, top_p=0.95, top_k=20, min_p=0.0
+        ),
+        input_token_price_1m=0.2,
+        output_token_price_1m=1.00,
+    ),
+    Model(
         id="Qwen/Qwen3-Coder-480B-A35B-Instruct",
         provider="deepinfra",
         name="Qwen 3 Coder",
