@@ -56,9 +56,12 @@ class InputHandler:
         self.is_message_processing = False
         self.swap_enter = swap_enter
         self._jumped_user_message = ""
-        self.voice_recording_active = False
 
         self.kb = self._setup_key_bindings()
+
+    def _is_voice_recording_active(self) -> bool:
+        voice_service = self.message_handler.voice_service
+        return bool(voice_service and voice_service.is_recording())
 
     def _setup_key_bindings(self):
         """Set up key bindings for multiline input."""
@@ -67,10 +70,9 @@ class InputHandler:
         newline_keys = ("escape", "enter") if self.swap_enter else ("enter",)
 
         def _stop_voice_recording(event):
-            if not self.voice_recording_active:
+            if not self._is_voice_recording_active():
                 return False
             event.app.exit(result="/end_voice")
-            self.voice_recording_active = False
             return True
 
         @kb.add(Keys.ControlS)
@@ -198,14 +200,14 @@ class InputHandler:
         @kb.add(Keys.Backspace)
         def _(event):
             if not event.current_buffer.text:
+                voice_recording_active = self._is_voice_recording_active()
                 prompt = Text(
                     PROMPT_CHAR
-                    if not self.is_message_processing
-                    and not self.voice_recording_active
+                    if not self.is_message_processing and not voice_recording_active
                     else "",
                     style=RICH_STYLE_BLUE,
                 )
-                if not self.is_message_processing and not self.voice_recording_active:
+                if not self.is_message_processing and not voice_recording_active:
                     import sys
 
                     sys.stdout.write("\x1b[1A")  # cursor up one line
@@ -281,7 +283,7 @@ class InputHandler:
                 self._jumped_user_message = ""
             self._current_prompt_session.message = HTML(PROMPT_CHAR)
             self._current_prompt_session.app.invalidate()
-            if not self.is_message_processing:
+            if not self.is_message_processing and not self._is_voice_recording_active():
                 self.display_handlers.print_divider("👤 YOU: ", with_time=True)
 
     def get_choice_input(self, message: str, values: list[str], default=None) -> str:
@@ -340,12 +342,12 @@ class InputHandler:
                 )
                 self._current_prompt_session = session
 
-                if not self.is_message_processing and not self.voice_recording_active:
+                voice_recording_active = self._is_voice_recording_active()
+                if not self.is_message_processing and not voice_recording_active:
                     self.display_handlers.print_divider("👤 YOU: ", with_time=True)
                 prompt_text = (
                     HTML(PROMPT_CHAR)
-                    if not self.is_message_processing
-                    and not self.voice_recording_active
+                    if not self.is_message_processing and not voice_recording_active
                     else ""
                 )
                 user_input = session.prompt(prompt_text)
@@ -427,7 +429,8 @@ class InputHandler:
             )
             self._start_input_thread()
         else:
-            if not self.voice_recording_active:
+            voice_recording_active = self._is_voice_recording_active()
+            if not voice_recording_active:
                 self.display_handlers.print_prompt_prefix(
                     self.message_handler.agent.name,
                     self.message_handler.agent.get_model(),
@@ -444,9 +447,6 @@ class InputHandler:
                 # Add None check here
                 if user_input is None:
                     continue
-
-                if user_input == "/voice":
-                    self.voice_recording_active = True
 
                 if user_input == "__EXIT__":
                     self.console.print(

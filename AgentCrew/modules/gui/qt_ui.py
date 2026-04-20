@@ -326,7 +326,7 @@ class ChatWindow(QMainWindow, Observer):
         if voice_service and hasattr(voice_service, "audio_handler"):
             voice_service.audio_handler.is_processing = is_processing
             if is_processing:
-                voice_service.audio_handler.audio_queue.queue.clear()
+                voice_service.audio_handler.clear_buffered_audio()
 
     @Slot(str)
     def display_error(self, error):
@@ -607,20 +607,19 @@ class ChatWindow(QMainWindow, Observer):
         elif event == "voice_recording_started":
             # Update UI to show recording state
             self.ui_state_manager.set_input_controls_enabled(False)
-            self.ui_state_manager.is_voice_activated = True
             self.message_input.setPlaceholderText(
                 "🎤 Recording... Click voice button to stop"
             )
-            # Update voice button to show recording state
             self.input_components.update_voice_button_state(True)
         elif event == "voice_activate":
+            if not data:
+                self._set_voice_processing_state(False)
+                return
             self._set_voice_processing_state(True)
-            if data:
-                self._add_user_message_bubble(data)
+            self._add_user_message_bubble(data)
             self.llm_worker.process_request.emit(data)
             self.ui_state_manager._set_send_button_state(True)
         elif event == "voice_recording_completed":
-            self.ui_state_manager.is_voice_activated = False
             self._set_voice_processing_state(False)
             self.message_input.setPlaceholderText("Type a message...")
             self.input_components.update_voice_button_state(False)
@@ -672,10 +671,8 @@ class ChatWindow(QMainWindow, Observer):
             self.style_provider.get_button_style("secondary")
         )
 
-        if (
-            hasattr(self.input_components, "is_voice_recording")
-            and self.input_components.is_voice_recording
-        ):
+        voice_service = getattr(self.message_handler, "voice_service", None)
+        if voice_service and voice_service.is_recording():
             self.voice_button.setStyleSheet(self.style_provider.get_button_style("red"))
         else:
             self.voice_button.setStyleSheet(

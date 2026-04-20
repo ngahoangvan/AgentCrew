@@ -1,6 +1,7 @@
 import os
 import tempfile
 import threading
+import time
 from typing import Dict, Any, Optional, Callable
 from io import BytesIO
 import queue
@@ -11,6 +12,9 @@ from .audio_handler import AudioHandler
 from .base import BaseVoiceService
 
 from loguru import logger
+
+
+ELEVENLABS_INTER_SENTENCE_GAP_SECONDS = 0.12
 
 
 class ElevenLabsVoiceService(BaseVoiceService):
@@ -185,6 +189,26 @@ class ElevenLabsVoiceService(BaseVoiceService):
 
         logger.debug("TTS worker thread stopped")
 
+    def _synthesize_tts_chunk_to_audio_bytes(
+        self, text: str, voice_id: Optional[str], model_id: Optional[str]
+    ) -> bytes:
+        response = self.client.text_to_speech.stream(
+            text=text,
+            voice_id=voice_id or self.default_voice_id,
+            model_id=model_id or self.default_model,
+            output_format="mp3_44100_128",
+            voice_settings=self.voice_settings,
+        )
+
+        audio_chunks = [chunk for chunk in response if isinstance(chunk, bytes) and chunk]
+        if not audio_chunks:
+            raise ValueError("ElevenLabs TTS returned empty audio")
+
+        return b"".join(audio_chunks)
+
+    def _play_audio_bytes(self, audio_bytes: bytes) -> None:
+        stream(iter([audio_bytes]))
+
     def _process_tts_request(
         self, text: str, voice_id: Optional[str], model_id: Optional[str]
     ):
@@ -197,31 +221,41 @@ class ElevenLabsVoiceService(BaseVoiceService):
             model_id: Model ID
         """
         try:
-            # Clean text for speech
-            cleaned_text = self.clean_text_for_speech(text)
-
-            if not cleaned_text.strip():
+            chunks = self._split_text_for_tts(text)
+            if not chunks:
                 logger.warning("No speakable text after cleaning")
                 return
 
-            logger.debug(f"Processing TTS for text: {cleaned_text[:50]}...")
-
-            # Generate speech stream
-            response = self.client.text_to_speech.stream(
-                text=cleaned_text,
-                voice_id=voice_id or self.default_voice_id,
-                model_id=model_id or self.default_model,
-                output_format="mp3_44100_128",
-                voice_settings=self.voice_settings,
+            logger.debug(
+                f"Processing TTS for {len(chunks)} chunk(s): {chunks[0][:50]}..."
             )
 
-            # Stream the audio
-            self.audio_handler.is_host_playing = True
-            stream(response)
-            self.audio_handler.is_host_playing = False
+            played_any = False
+            try:
+                for audio_bytes in self._iter_synthesized_tts_chunks_in_order(
+                    chunks,
+                    lambda chunk: self._synthesize_tts_chunk_to_audio_bytes(
+                        chunk, voice_id, model_id
+                    ),
+                ):
+                    if not played_any:
+                        self.audio_handler.is_host_playing = True
+                        played_any = True
+                    else:
+                        time.sleep(ELEVENLABS_INTER_SENTENCE_GAP_SECONDS)
+
+                    self._play_audio_bytes(audio_bytes)
+            finally:
+                self.audio_handler.is_host_playing = False
+
+            if not played_any:
+                logger.warning("ElevenLabs TTS produced no playable chunks")
+                return
+
             logger.debug("TTS streaming completed")
 
         except Exception as e:
+            self.audio_handler.is_host_playing = False
             logger.error(f"Text-to-speech processing failed: {str(e)}")
 
     def text_to_speech_stream(

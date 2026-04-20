@@ -76,7 +76,7 @@ class ConsoleUI(Observer):
         if voice_service and hasattr(voice_service, "audio_handler"):
             voice_service.audio_handler.is_processing = is_processing
             if is_processing:
-                voice_service.audio_handler._drain_audio_queue()
+                voice_service.audio_handler.clear_buffered_audio()
 
     def _clear_pending_input_queue(self):
         while True:
@@ -106,7 +106,6 @@ class ConsoleUI(Observer):
             self.message_handler._notify("error", f"Voice activation failed: {str(e)}")
         finally:
             self.input_handler.is_message_processing = False
-            self.input_handler.voice_recording_active = False
             self._clear_pending_input_queue()
             self._set_voice_processing_state(False)
 
@@ -363,7 +362,6 @@ class ConsoleUI(Observer):
         elif event == "update_token_usage":
             self._calculate_token_usage(data["input_tokens"], data["output_tokens"])
         elif event == "voice_recording_started":
-            self.input_handler.voice_recording_active = True
             self.display_handlers.display_message(
                 Text("Start recording. Press Enter to stop...", style="bold yellow")
             )
@@ -380,9 +378,8 @@ class ConsoleUI(Observer):
             self.display_handlers.display_message(
                 Text("⏹️  Stopping recording...", style="bold yellow")
             )
-            self.input_handler.voice_recording_active = False
         elif event == "voice_recording_completed":
-            self.input_handler.voice_recording_active = False
+            pass
 
     def copy_to_clipboard(self, text: str):
         """Copy text to clipboard and show confirmation."""

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
+from concurrent.futures import ThreadPoolExecutor
 import threading
 import queue
 
@@ -180,6 +181,116 @@ class BaseVoiceService(ABC):
         Clear any pending TTS requests.
         """
         pass
+
+    def _split_text_for_tts(
+        self, text: str, max_chunk_length: int = 160
+    ) -> List[str]:
+        cleaned_text = self.clean_text_for_speech(text)
+        if not cleaned_text.strip():
+            return []
+
+        if self.text_cleaner is None:
+            return [cleaned_text]
+
+        initial_chunks = self.text_cleaner.split_into_sentences(cleaned_text)
+        if not initial_chunks:
+            return [cleaned_text]
+
+        chunks: List[str] = []
+        current_chunk = ""
+
+        for chunk in initial_chunks:
+            normalized_chunk = " ".join(chunk.split()).strip()
+            if not normalized_chunk:
+                continue
+
+            if len(normalized_chunk) > max_chunk_length:
+                if current_chunk:
+                    chunks.append(current_chunk)
+                    current_chunk = ""
+                chunks.extend(
+                    self._split_long_tts_chunk(normalized_chunk, max_chunk_length)
+                )
+                continue
+
+            candidate = (
+                normalized_chunk
+                if not current_chunk
+                else f"{current_chunk} {normalized_chunk}"
+            )
+            if current_chunk and len(candidate) > max_chunk_length:
+                chunks.append(current_chunk)
+                current_chunk = normalized_chunk
+            else:
+                current_chunk = candidate
+
+        if current_chunk:
+            chunks.append(current_chunk)
+
+        return chunks or [cleaned_text]
+
+    def _split_long_tts_chunk(self, text: str, max_chunk_length: int) -> List[str]:
+        words = text.split()
+        if not words:
+            return []
+
+        chunks: List[str] = []
+        current_chunk = ""
+
+        for word in words:
+            candidate = word if not current_chunk else f"{current_chunk} {word}"
+            if current_chunk and len(candidate) > max_chunk_length:
+                chunks.append(current_chunk)
+                current_chunk = word
+            else:
+                current_chunk = candidate
+
+        if current_chunk:
+            chunks.append(current_chunk)
+
+        return chunks
+
+    def _synthesize_tts_chunks_concurrently(
+        self,
+        chunks: List[str],
+        synthesize_func: Callable[[str], Any],
+        max_workers: int = 3,
+    ) -> List[Any]:
+        prepared_chunks = [chunk.strip() for chunk in chunks if chunk and chunk.strip()]
+        if not prepared_chunks:
+            return []
+
+        if len(prepared_chunks) == 1:
+            return [synthesize_func(prepared_chunks[0])]
+
+        worker_count = max(1, min(max_workers, len(prepared_chunks)))
+        with ThreadPoolExecutor(max_workers=worker_count) as executor:
+            futures = [
+                executor.submit(synthesize_func, chunk) for chunk in prepared_chunks
+            ]
+            return [future.result() for future in futures]
+
+    def _iter_synthesized_tts_chunks_in_order(
+        self,
+        chunks: List[str],
+        synthesize_func: Callable[[str], Any],
+        max_workers: int = 3,
+    ):
+        prepared_chunks = [chunk.strip() for chunk in chunks if chunk and chunk.strip()]
+        if not prepared_chunks:
+            return
+
+        if len(prepared_chunks) == 1:
+            yield synthesize_func(prepared_chunks[0])
+            return
+
+        worker_count = max(1, min(max_workers, len(prepared_chunks)))
+        with ThreadPoolExecutor(max_workers=worker_count) as executor:
+            futures = [
+                executor.submit(synthesize_func, chunk) for chunk in prepared_chunks
+            ]
+            for future in futures:
+                yield future.result()
 
     # Protected methods that implementations may need to override
     def _start_tts_thread(self) -> None:

@@ -755,10 +755,19 @@ class CommandProcessor:
                 )
                 return CommandResult(handled=True, clear_flag=True)
 
+            if self.message_handler.has_active_stream():
+                self.message_handler._notify(
+                    "system_message",
+                    "🎤 Voice input is unavailable while the assistant is still responding.",
+                )
+                return CommandResult(handled=True, clear_flag=True)
+
             async def submit_active_voice(audio_data: Any, sample_rate: int):
                 if self.message_handler.has_active_stream():
                     return
                 transcript = await self._voice_transcript(audio_data, sample_rate)
+                if self.message_handler.has_active_stream():
+                    return
                 self.message_handler._notify("voice_activate", transcript)
 
             # Start recording

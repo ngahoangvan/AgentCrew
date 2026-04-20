@@ -78,8 +78,6 @@ class InputComponents:
         )
         self.chat_window.voice_button.setToolTip("Start/Stop voice recording")
 
-        self.is_voice_recording = False
-
         buttons_layout.addWidget(self.chat_window.send_button)
         buttons_layout.addWidget(self.chat_window.file_button)
         buttons_layout.addWidget(self.chat_window.voice_button)
@@ -321,19 +319,20 @@ class InputComponents:
         cursor.setPosition(position, QTextCursor.MoveMode.KeepAnchor)
         cursor.insertText(f"@{completion}")
 
+    def _is_voice_recording_active(self) -> bool:
+        voice_service = getattr(self.chat_window.message_handler, "voice_service", None)
+        return bool(voice_service and voice_service.is_recording())
+
     @Slot()
     def handle_voice_button_click(self):
         """Handle voice button click to start/stop recording."""
-        if not self.is_voice_recording:
-            # Start recording
+        if not self._is_voice_recording_active():
             self.chat_window.llm_worker.process_request.emit("/voice")
         else:
             self.stop_voice_recording()
 
     def update_voice_button_state(self, is_recording: bool):
         """Update the voice button icon and state based on recording status."""
-        self.is_voice_recording = is_recording
-
         if is_recording:
             # Change to stop icon when recording
             stop_icon = qta.icon("fa6s.stop", color="white")
@@ -355,15 +354,8 @@ class InputComponents:
 
     def stop_voice_recording(self):
         """Stop voice recording if active."""
-        self.chat_window.ui_state_manager.is_voice_activated = False
-        self.chat_window.message_input.setPlaceholderText("Type a message...")
-        self.chat_window.input_components.update_voice_button_state(False)
-        self.chat_window.ui_state_manager.set_input_controls_enabled(
-            self.chat_window.ui_state_manager._last_enabled_state
-        )
-        self.chat_window.ui_state_manager._set_send_button_state(
-            not self.chat_window.ui_state_manager._last_enabled_state
-        )
+        if not self._is_voice_recording_active():
+            return
         self.chat_window.llm_worker.process_request.emit("/end_voice")
 
     def get_input_layout(self):

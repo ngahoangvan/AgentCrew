@@ -1,6 +1,7 @@
 import os
 import tempfile
 import threading
+import time
 from typing import Dict, Any, Optional, Callable
 import queue
 
@@ -19,6 +20,7 @@ from loguru import logger
 DEEPINFRA_OPENAI_BASE_URL = "https://api.deepinfra.com/v1/openai"
 DEEPINFRA_TTS_RESPONSE_FORMAT = "pcm"
 DEEPINFRA_PCM_SAMPLE_RATE = 24000
+DEEPINFRA_INTER_SENTENCE_GAP_SECONDS = 0.12
 DEEPINFRA_FALLBACK_VOICES = [
     {"voice_id": "alloy", "name": "Alloy", "category": "standard"},
     {"voice_id": "echo", "name": "Echo", "category": "standard"},
@@ -188,39 +190,63 @@ class DeepInfraVoiceService(BaseVoiceService):
         )
         return self.client.audio.speech.with_streaming_response.create(**request_kwargs)
 
+    def _synthesize_tts_chunk_to_pcm_bytes(
+        self, text: str, voice_id: Optional[str], model_id: Optional[str]
+    ) -> bytes:
+        with self._create_tts_stream(
+            text=text,
+            voice_id=voice_id,
+            model_id=model_id,
+            response_format="pcm",
+        ) as response:
+            pcm_bytes = response.read()
+
+        if not pcm_bytes:
+            raise ValueError("DeepInfra PCM TTS returned empty audio")
+
+        return pcm_bytes
+
+    def _play_pcm_bytes(self, pcm_bytes: bytes) -> None:
+        audio_data = (
+            np.frombuffer(pcm_bytes, dtype=np.int16).astype(np.float32) / 32768.0
+        )
+        sd.play(audio_data, DEEPINFRA_PCM_SAMPLE_RATE)
+        sd.wait()
+
     def _process_tts_request(
         self, text: str, voice_id: Optional[str], model_id: Optional[str]
     ):
         try:
-            cleaned_text = self.clean_text_for_speech(text)
-            if not cleaned_text.strip():
+            chunks = self._split_text_for_tts(text)
+            if not chunks:
                 logger.warning("No speakable text after cleaning")
                 return
 
-            logger.debug(f"Processing TTS for text: {cleaned_text[:50]}...")
+            logger.debug(
+                f"Processing TTS for {len(chunks)} chunk(s): {chunks[0][:50]}..."
+            )
 
-            self.audio_handler.is_host_playing = True
+            played_any = False
             try:
-                with self._create_tts_stream(
-                    text=text,
-                    voice_id=voice_id,
-                    model_id=model_id,
-                    response_format="pcm",
-                ) as response:
-                    pcm_bytes = response.read()
+                for pcm_bytes in self._iter_synthesized_tts_chunks_in_order(
+                    chunks,
+                    lambda chunk: self._synthesize_tts_chunk_to_pcm_bytes(
+                        chunk, voice_id, model_id
+                    ),
+                ):
+                    if not played_any:
+                        self.audio_handler.is_host_playing = True
+                        played_any = True
+                    else:
+                        time.sleep(DEEPINFRA_INTER_SENTENCE_GAP_SECONDS)
 
-                if not pcm_bytes:
-                    logger.warning("DeepInfra PCM TTS returned empty audio")
-                    return
-
-                audio_data = (
-                    np.frombuffer(pcm_bytes, dtype=np.int16).astype(np.float32)
-                    / 32768.0
-                )
-                sd.play(audio_data, DEEPINFRA_PCM_SAMPLE_RATE)
-                sd.wait()
+                    self._play_pcm_bytes(pcm_bytes)
             finally:
                 self.audio_handler.is_host_playing = False
+
+            if not played_any:
+                logger.warning("DeepInfra TTS produced no playable chunks")
+                return
 
             logger.debug("TTS streaming completed (DeepInfra)")
         except Exception as e:

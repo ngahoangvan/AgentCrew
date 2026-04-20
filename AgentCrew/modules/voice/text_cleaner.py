@@ -131,6 +131,12 @@ class TextCleaner(BaseTextCleaner):
         Returns:
             List of sentences
         """
-        # Simple sentence splitting
-        sentences = re.split(r"(?<=[.!?])\s+", text)
-        return [s.strip() for s in sentences if s.strip()]
+        normalized_text = re.sub(r"\s+", " ", text).strip()
+        if not normalized_text:
+            return []
+
+        sentences = re.findall(
+            r".+?(?:[.!?,;:]|$)",
+            normalized_text,
+        )
+        return [sentence.strip() for sentence in sentences if sentence.strip()]

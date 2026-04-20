@@ -27,6 +27,9 @@ class AudioHandler(BaseAudioHandler):
         self.is_processing = False
         self.recording_thread = None
         self.audio_queue = queue.Queue()
+        self._completion_queue = queue.Queue()
+        self._completion_thread = None
+        self._completion_worker_stop = threading.Event()
         self.current_sample_rate = 44100
         self.silero_vad_model = None
         self._is_start_voice_activity = False
@@ -43,6 +46,9 @@ class AudioHandler(BaseAudioHandler):
                 break
         return frames
 
+    def clear_buffered_audio(self) -> None:
+        self._drain_audio_queue()
+
     def _reset_voice_activity_state(self, clear_audio_queue: bool = False) -> None:
         self._is_start_voice_activity = False
         self._is_still_speaking = False
@@ -50,6 +56,53 @@ class AudioHandler(BaseAudioHandler):
         self._vad_chunk_count = 0
         if clear_audio_queue:
             self._drain_audio_queue()
+
+    def _ensure_completion_worker(self) -> None:
+        if self._completion_thread and self._completion_thread.is_alive():
+            return
+
+        self._completion_worker_stop.clear()
+        self._completion_thread = threading.Thread(
+            target=self._completion_worker,
+            daemon=True,
+        )
+        self._completion_thread.start()
+
+    def _stop_completion_worker(self) -> None:
+        if not self._completion_thread:
+            return
+
+        self._completion_worker_stop.set()
+        try:
+            self._completion_queue.put_nowait(None)
+        except queue.Full:
+            pass
+        self._completion_thread.join(timeout=1.0)
+        self._completion_thread = None
+
+    def _completion_worker(self) -> None:
+        while not self._completion_worker_stop.is_set():
+            try:
+                job = self._completion_queue.get(timeout=0.1)
+            except queue.Empty:
+                continue
+
+            if job is None:
+                self._completion_queue.task_done()
+                break
+
+            frames, sample_rate, voice_completed_cb = job
+
+            try:
+                audio_data = np.concatenate(frames, axis=0).flatten()
+                logger.info(
+                    f"Recording stopped. Captured {len(audio_data) / sample_rate:.2f} seconds"
+                )
+                asyncio.run(voice_completed_cb(audio_data, sample_rate))
+            except Exception as e:
+                logger.error(f"Voice completion processing error: {e}")
+            finally:
+                self._completion_queue.task_done()
 
     def start_recording(
         self, sample_rate: int = 44100, voice_completed_cb: Optional[Callable] = None
@@ -79,6 +132,7 @@ class AudioHandler(BaseAudioHandler):
         self.recording = True
         self.current_sample_rate = sample_rate
         self._reset_voice_activity_state(clear_audio_queue=True)
+        self._ensure_completion_worker()
 
         self.recording_thread = threading.Thread(
             target=self._recording_worker,
@@ -215,14 +269,16 @@ class AudioHandler(BaseAudioHandler):
                                 self._reset_voice_activity_state()
 
                                 if frames:
-                                    audio_data = np.concatenate(frames, axis=0).flatten()
-                                    logger.info(
-                                        f"Recording stopped. Captured {len(audio_data) / self.current_sample_rate:.2f} seconds"
-                                    )
+                                    if self.is_processing:
+                                        self._drain_audio_queue()
+                                        return
+
                                     if voice_completed_cb:
-                                        asyncio.run(
-                                            voice_completed_cb(
-                                                audio_data, self.current_sample_rate
+                                        self._completion_queue.put(
+                                            (
+                                                frames,
+                                                self.current_sample_rate,
+                                                voice_completed_cb,
                                             )
                                         )
                             elif self._is_start_voice_activity:
@@ -259,5 +315,6 @@ class AudioHandler(BaseAudioHandler):
         try:
             if self.recording:
                 self.stop_recording()
+            self._stop_completion_worker()
         except Exception:
             pass

@@ -614,9 +614,22 @@ class MessageHandler(Observable):
             self._run_stream_response(session, input_tokens, output_tokens)
         )
         session.bind(loop, task)
+
+        audio_handler = None
+        if self.voice_service is not None:
+            audio_handler = getattr(self.voice_service, "audio_handler", None)
+
+        if audio_handler is not None:
+            audio_handler.is_processing = True
+            clear_buffered_audio = getattr(audio_handler, "clear_buffered_audio", None)
+            if callable(clear_buffered_audio):
+                clear_buffered_audio()
+
         try:
             return await task
         finally:
+            if audio_handler is not None:
+                audio_handler.is_processing = False
             if not session.finished.is_set() and task.cancelled():
                 session.finalize("canceled")
             self._clear_stream_session(session)
