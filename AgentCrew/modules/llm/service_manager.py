@@ -131,9 +131,12 @@ class ServiceManager:
         extra_headers: Optional[Dict] = None,
     ) -> BaseLLMService:
         """Lazy import and create Custom LLM service."""
-        from AgentCrew.modules.custom_llm import CustomLLMService
+        from AgentCrew.modules.custom_llm import CustomLLMService, OpenCodeService
 
-        return CustomLLMService(
+        service_class = (
+            OpenCodeService if provider_name == "opencode_go" else CustomLLMService
+        )
+        return service_class(
             base_url=base_url,
             api_key=api_key,
             provider_name=provider_name,

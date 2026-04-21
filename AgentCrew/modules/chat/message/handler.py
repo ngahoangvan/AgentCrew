@@ -554,7 +554,10 @@ class MessageHandler(Observable):
             from openai import BadRequestError
 
             if isinstance(e, BadRequestError):
-                if e.code == "model_max_prompt_tokens_exceeded":
+                if (
+                    e.code == "model_max_prompt_tokens_exceeded"
+                    or e.message.find("This endpoint's maximum context length is") >= 0
+                ):
                     from AgentCrew.modules.agents import LocalAgent
                     from AgentCrew.modules.llm.model_registry import ModelRegistry
 
