@@ -266,7 +266,12 @@ class LocalAgent(BaseAgent):
         Returns:
             Dict[str, Any]: A properly formatted message to append to the messages list
         """
-        if tool_uses and any(tu.get("id") for tu in tool_uses):
+        valid_tool_uses = [
+            tool_use
+            for tool_use in (tool_uses or [])
+            if tool_use.get("id") and tool_use.get("name")
+        ]
+        if valid_tool_uses:
             return {
                 "role": "assistant",
                 "agent": self.name,
@@ -278,8 +283,7 @@ class LocalAgent(BaseAgent):
                         "arguments": tool_use["input"],
                         "type": tool_use.get("type", "tool_call"),
                     }
-                    for tool_use in tool_uses
-                    if tool_use.get("id")  # Only include tool calls with valid IDs
+                    for tool_use in valid_tool_uses
                 ],
             }
         else:

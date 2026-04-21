@@ -4,7 +4,6 @@ from dotenv import load_dotenv
 from loguru import logger
 from typing import Dict, List, Optional, Tuple
 import ast
-import json
 
 
 class DeepInfraService(CustomLLMService):
@@ -103,74 +102,21 @@ class DeepInfraService(CustomLLMService):
         if hasattr(delta_chunk, "tool_calls"):
             delta_tool_calls = chunk.choices[0].delta.tool_calls
             if delta_tool_calls:
-                # Process each tool call in the delta
                 for tool_call_delta in delta_tool_calls:
-                    # Check if this is a new tool call
-                    if getattr(tool_call_delta, "id"):
-                        # Create a new tool call entry
-                        tool_uses.append(
-                            {
-                                "id": getattr(tool_call_delta, "id")
-                                if hasattr(tool_call_delta, "id")
-                                else f"toolu_{len(tool_uses)}",
-                                "name": getattr(tool_call_delta.function, "name", "")
-                                if hasattr(tool_call_delta, "function")
-                                else "",
-                                "input": {},
-                                "type": "function",
-                                "response": "",
-                            }
-                        )
+                    tool_call_index = self._merge_stream_tool_call_delta(
+                        tool_uses, tool_call_delta
+                    )
+                    if tool_call_index is None:
+                        continue
 
-                    tool_call_index = len(tool_uses) - 1
-
-                    # # Update existing tool call with new data
-                    # if hasattr(tool_call_delta, "id") and tool_call_delta.id:
-                    #     tool_uses[tool_call_index]["id"] = tool_call_delta.id
-
-                    if hasattr(tool_call_delta, "function"):
-                        if (
-                            hasattr(tool_call_delta.function, "name")
-                            and tool_call_delta.function.name
-                        ):
-                            tool_uses[tool_call_index]["name"] = (
-                                tool_call_delta.function.name
-                            )
-
-                        if (
-                            hasattr(tool_call_delta.function, "arguments")
-                            and tool_call_delta.function.arguments
-                        ):
-                            # Accumulate arguments as they come in chunks
-                            current_args = tool_uses[tool_call_index].get(
-                                "args_json", ""
-                            )
-                            tool_uses[tool_call_index]["args_json"] = (
-                                current_args + tool_call_delta.function.arguments
-                            )
-
-                            # Try to parse JSON if it seems complete
-                            try:
-                                args_json = tool_uses[tool_call_index]["args_json"]
-                                tool_uses[tool_call_index]["input"] = json.loads(
-                                    args_json
-                                )
-                                # this piece of code is to fix the isuse of deepinfra cannot load all of arguments structure
-                                for key, value in tool_uses[tool_call_index][
-                                    "input"
-                                ].items():
-                                    if isinstance(value, str):
-                                        try:
-                                            tool_uses[tool_call_index]["input"][key] = (
-                                                ast.literal_eval(value)
-                                            )
-                                        except Exception:
-                                            # just skip if literal_eval fails
-                                            pass
-                                # Keep args_json for accumulation but use input for execution
-                            except json.JSONDecodeError:
-                                # Arguments JSON is still incomplete, keep accumulating
-                                pass
+                    parsed_input = tool_uses[tool_call_index].get("input", {})
+                    if isinstance(parsed_input, dict):
+                        for key, value in parsed_input.items():
+                            if isinstance(value, str):
+                                try:
+                                    parsed_input[key] = ast.literal_eval(value)
+                                except Exception:
+                                    pass
 
         return (
             assistant_response or " ",

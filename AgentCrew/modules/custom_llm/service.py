@@ -33,6 +33,161 @@ class CustomLLMService(OpenAIService):
         )
         self.extra_headers = extra_headers
 
+    @staticmethod
+    def _has_usable_tool_name(name: Any) -> bool:
+        return isinstance(name, str) and bool(name.strip())
+
+    @staticmethod
+    def _safe_json_loads(raw_arguments: Any) -> Dict[str, Any]:
+        if isinstance(raw_arguments, dict):
+            return raw_arguments
+        if not raw_arguments:
+            return {}
+        if isinstance(raw_arguments, str):
+            try:
+                parsed_arguments = json.loads(raw_arguments)
+                return parsed_arguments if isinstance(parsed_arguments, dict) else {}
+            except json.JSONDecodeError:
+                return {}
+        return {}
+
+    def _normalize_tool_call_for_request(
+        self, raw_tool_call: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
+        tool_call = dict(raw_tool_call)
+        tool_name = tool_call.get("name")
+        if not self._has_usable_tool_name(tool_name):
+            logger.warning(
+                "Dropping malformed assistant tool call without a usable name before provider conversion"
+            )
+            return None
+
+        return {
+            "id": tool_call.get("id"),
+            "type": tool_call.get("type", "function"),
+            "function": {
+                "name": tool_name,
+                "arguments": json.dumps(tool_call.get("arguments", {})),
+            },
+        }
+
+    def _append_non_stream_tool_call(
+        self, tool_uses: List[Dict[str, Any]], tool_call: Any
+    ) -> bool:
+        function = getattr(tool_call, "function", None)
+        tool_name = getattr(function, "name", None) if function else None
+        if not self._has_usable_tool_name(tool_name):
+            logger.warning(
+                "Dropping malformed provider tool call without a usable name"
+            )
+            return False
+
+        tool_uses.append(
+            {
+                "id": getattr(tool_call, "id", None)
+                or f"toolu_{tool_name}_{len(tool_uses)}",
+                "name": tool_name,
+                "input": self._safe_json_loads(
+                    getattr(function, "arguments", "") if function else ""
+                ),
+                "type": getattr(tool_call, "type", "function"),
+                "response": "",
+            }
+        )
+        return True
+
+    def _resolve_stream_tool_call_index(
+        self, tool_uses: List[Dict[str, Any]], tool_call_delta: Any
+    ) -> Optional[int]:
+        tool_call_index = getattr(tool_call_delta, "index", None)
+        if tool_call_index is not None:
+            while len(tool_uses) <= tool_call_index:
+                tool_uses.append(
+                    {
+                        "id": None,
+                        "name": "",
+                        "input": {},
+                        "type": "function",
+                        "response": "",
+                    }
+                )
+            return tool_call_index
+
+        tool_call_id = getattr(tool_call_delta, "id", None)
+        if tool_call_id:
+            for existing_index, tool_use in enumerate(tool_uses):
+                if tool_use.get("id") == tool_call_id:
+                    return existing_index
+
+        function = getattr(tool_call_delta, "function", None)
+        tool_name = getattr(function, "name", None) if function else None
+        if self._has_usable_tool_name(tool_name):
+            tool_uses.append(
+                {
+                    "id": tool_call_id or f"toolu_{tool_name}_{len(tool_uses)}",
+                    "name": tool_name,
+                    "input": {},
+                    "type": "function",
+                    "response": "",
+                }
+            )
+            return len(tool_uses) - 1
+
+        logger.debug(
+            "Skipping malformed tool call delta without a usable name and without a matching existing tool call"
+        )
+        return None
+
+    def _merge_stream_tool_call_delta(
+        self, tool_uses: List[Dict[str, Any]], tool_call_delta: Any
+    ) -> Optional[int]:
+        tool_call_index = self._resolve_stream_tool_call_index(tool_uses, tool_call_delta)
+        if tool_call_index is None:
+            return None
+
+        tool_use = tool_uses[tool_call_index]
+
+        if hasattr(tool_call_delta, "id") and tool_call_delta.id:
+            tool_use["id"] = tool_call_delta.id
+
+        if hasattr(tool_call_delta, "function"):
+            if (
+                hasattr(tool_call_delta.function, "name")
+                and self._has_usable_tool_name(tool_call_delta.function.name)
+            ):
+                tool_use["name"] = tool_call_delta.function.name
+
+            if (
+                hasattr(tool_call_delta.function, "arguments")
+                and tool_call_delta.function.arguments
+            ):
+                current_args = tool_use.get("args_json", "")
+                tool_use["args_json"] = (
+                    current_args + tool_call_delta.function.arguments
+                )
+
+                try:
+                    parsed_arguments = json.loads(tool_use["args_json"])
+                    if isinstance(parsed_arguments, dict):
+                        tool_use["input"] = parsed_arguments
+                except json.JSONDecodeError:
+                    pass
+
+        return tool_call_index
+
+    def filter_invalid_tool_uses(
+        self, tool_uses: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        filtered_tool_uses = []
+        for tool_use in tool_uses:
+            if self._has_usable_tool_name(tool_use.get("name")):
+                filtered_tool_uses.append(tool_use)
+            elif tool_use.get("id") or tool_use.get("args_json"):
+                logger.warning(
+                    "Dropping malformed parsed tool call without a usable name"
+                )
+        return filtered_tool_uses
+
     async def process_message(self, prompt: str, temperature: float = 0) -> str:
         result_text = ""
         input_tokens = 0
@@ -98,12 +253,14 @@ class CustomLLMService(OpenAIService):
         for msg in messages:
             msg.pop("agent", None)
             if "tool_calls" in msg and msg.get("tool_calls", []):
-                for tool_call in msg["tool_calls"]:
-                    tool_call["function"] = {}
-                    tool_call["function"]["name"] = tool_call.pop("name", "")
-                    tool_call["function"]["arguments"] = json.dumps(
-                        tool_call.pop("arguments", {})
+                normalized_tool_calls = []
+                for raw_tool_call in msg["tool_calls"]:
+                    normalized_tool_call = self._normalize_tool_call_for_request(
+                        raw_tool_call
                     )
+                    if normalized_tool_call:
+                        normalized_tool_calls.append(normalized_tool_call)
+                msg["tool_calls"] = normalized_tool_calls
             if msg.get("role") == "tool":
                 msg.pop("tool_name", None)
                 if isinstance(msg.get("content", ""), List):
@@ -277,17 +434,7 @@ class CustomLLMService(OpenAIService):
             # Check for tool calls
             if hasattr(message, "tool_calls") and message.tool_calls:
                 for tool_call in message.tool_calls:
-                    function = tool_call.function
-
-                    tool_uses.append(
-                        {
-                            "id": f"toolu_{function.name}_{len(tool_uses)}",
-                            "name": function.name,
-                            "input": json.loads(function.arguments),
-                            "type": tool_call.type,
-                            "response": "",
-                        }
-                    )
+                    self._append_non_stream_tool_call(tool_uses, tool_call)
 
                 # Return with tool use information and the full content
                 return (
@@ -422,61 +569,8 @@ class CustomLLMService(OpenAIService):
         ):
             delta_tool_calls = chunk.choices[0].delta.tool_calls
             if delta_tool_calls:
-                # Process each tool call in the delta
                 for tool_call_delta in delta_tool_calls:
-                    # Check if this is a new tool call
-                    if getattr(tool_call_delta, "id"):
-                        # Create a new tool call entry
-                        tool_uses.append(
-                            {
-                                "id": getattr(tool_call_delta, "id")
-                                if hasattr(tool_call_delta, "id")
-                                else f"toolu_{len(tool_uses)}",
-                                "name": getattr(tool_call_delta.function, "name", "")
-                                if hasattr(tool_call_delta, "function")
-                                else "",
-                                "input": {},
-                                "type": "function",
-                                "response": "",
-                            }
-                        )
-                    tool_call_index = len(tool_uses) - 1
-
-                    # # Update existing tool call with new data
-                    # if hasattr(tool_call_delta, "id") and tool_call_delta.id:
-                    #     tool_uses[tool_call_index]["id"] = tool_call_delta.id
-
-                    if hasattr(tool_call_delta, "function"):
-                        if (
-                            hasattr(tool_call_delta.function, "name")
-                            and tool_call_delta.function.name
-                        ):
-                            tool_uses[tool_call_index]["name"] = (
-                                tool_call_delta.function.name
-                            )
-
-                        if (
-                            hasattr(tool_call_delta.function, "arguments")
-                            and tool_call_delta.function.arguments
-                        ):
-                            # Accumulate arguments as they come in chunks
-                            current_args = tool_uses[tool_call_index].get(
-                                "args_json", ""
-                            )
-                            tool_uses[tool_call_index]["args_json"] = (
-                                current_args + tool_call_delta.function.arguments
-                            )
-
-                            # Try to parse JSON if it seems complete
-                            try:
-                                args_json = tool_uses[tool_call_index]["args_json"]
-                                tool_uses[tool_call_index]["input"] = json.loads(
-                                    args_json
-                                )
-                                # Keep args_json for accumulation but use input for execution
-                            except json.JSONDecodeError:
-                                # Arguments JSON is still incomplete, keep accumulating
-                                pass
+                    self._merge_stream_tool_call_delta(tool_uses, tool_call_delta)
 
         return (
             assistant_response or " ",

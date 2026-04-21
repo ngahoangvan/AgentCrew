@@ -5,7 +5,6 @@ from dotenv import load_dotenv
 from loguru import logger
 from typing import Dict, Any, Optional, List, Tuple
 from datetime import datetime
-import json
 from uuid import uuid4
 
 
@@ -121,12 +120,14 @@ class GithubCopilotService(CustomLLMService):
                     msg["content"] = []
 
             if "tool_calls" in msg and msg.get("tool_calls", []):
-                for tool_call in msg["tool_calls"]:
-                    tool_call["function"] = {}
-                    tool_call["function"]["name"] = tool_call.pop("name", "")
-                    tool_call["function"]["arguments"] = json.dumps(
-                        tool_call.pop("arguments", {})
+                normalized_tool_calls = []
+                for raw_tool_call in msg["tool_calls"]:
+                    normalized_tool_call = self._normalize_tool_call_for_request(
+                        raw_tool_call
                     )
+                    if normalized_tool_call:
+                        normalized_tool_calls.append(normalized_tool_call)
+                msg["tool_calls"] = normalized_tool_calls
 
             if msg.get("role") == "tool":
                 # Special treatment for GitHub Copilot GPT-4.1 model
@@ -239,61 +240,8 @@ class GithubCopilotService(CustomLLMService):
         if hasattr(delta_chunk, "tool_calls"):
             delta_tool_calls = chunk.choices[0].delta.tool_calls
             if delta_tool_calls:
-                # Process each tool call in the delta
                 for tool_call_delta in delta_tool_calls:
-                    # Check if this is a new tool call
-                    if getattr(tool_call_delta, "id"):
-                        # Create a new tool call entry
-                        tool_uses.append(
-                            {
-                                "id": getattr(tool_call_delta, "id")
-                                if hasattr(tool_call_delta, "id")
-                                else f"toolu_{len(tool_uses)}",
-                                "name": getattr(tool_call_delta.function, "name", "")
-                                if hasattr(tool_call_delta, "function")
-                                else "",
-                                "input": {},
-                                "type": "function",
-                                "response": "",
-                            }
-                        )
-                    tool_call_index = len(tool_uses) - 1
-
-                    # # Update existing tool call with new data
-                    # if hasattr(tool_call_delta, "id") and tool_call_delta.id:
-                    #     tool_uses[tool_call_index]["id"] = tool_call_delta.id
-
-                    if hasattr(tool_call_delta, "function"):
-                        if (
-                            hasattr(tool_call_delta.function, "name")
-                            and tool_call_delta.function.name
-                        ):
-                            tool_uses[tool_call_index]["name"] = (
-                                tool_call_delta.function.name
-                            )
-
-                        if (
-                            hasattr(tool_call_delta.function, "arguments")
-                            and tool_call_delta.function.arguments
-                        ):
-                            # Accumulate arguments as they come in chunks
-                            current_args = tool_uses[tool_call_index].get(
-                                "args_json", ""
-                            )
-                            tool_uses[tool_call_index]["args_json"] = (
-                                current_args + tool_call_delta.function.arguments
-                            )
-
-                            # Try to parse JSON if it seems complete
-                            try:
-                                args_json = tool_uses[tool_call_index]["args_json"]
-                                tool_uses[tool_call_index]["input"] = json.loads(
-                                    args_json
-                                )
-                                # Keep args_json for accumulation but use input for execution
-                            except json.JSONDecodeError:
-                                # Arguments JSON is still incomplete, keep accumulating
-                                pass
+                    self._merge_stream_tool_call_delta(tool_uses, tool_call_delta)
 
         return (
             assistant_response or " ",

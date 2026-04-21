@@ -210,13 +210,19 @@ class ApplicationSetup:
             code_analysis_service = None
 
         try:
-            if os.getenv("OPENAI_API_KEY"):
-                image_gen_service = ImageGenerationService()
+            if provider == "openai_codex":
+                image_gen_service = ImageGenerationService(provider="openai_codex")
+            elif os.getenv("OPENAI_API_KEY"):
+                image_gen_service = ImageGenerationService(provider="openai")
             else:
-                image_gen_service = None
-                click.echo(
-                    "\u26a0\ufe0f Image generation service not available: No API keys found."
-                )
+                try:
+                    image_gen_service = ImageGenerationService(provider="openai_codex")
+                    click.echo("\u2139\ufe0f Image generation using ChatGPT subscription (Codex).")
+                except Exception:
+                    image_gen_service = None
+                    click.echo(
+                        "\u26a0\ufe0f Image generation service not available: No API keys found."
+                    )
         except Exception as e:
             click.echo(f"\u26a0\ufe0f Image generation service not available: {str(e)}")
             image_gen_service = None

@@ -1,5 +1,4 @@
 from typing import Any, Dict, List, Optional, Tuple
-import json
 
 from AgentCrew.modules.custom_llm.service import CustomLLMService
 from AgentCrew.modules.llm.model_registry import ModelRegistry
@@ -11,17 +10,9 @@ class OpenCodeService(CustomLLMService):
     ) -> List[Dict[str, Any]]:
         normalized_tool_calls = []
         for raw_tool_call in tool_calls:
-            tool_call = dict(raw_tool_call)
-            normalized_tool_calls.append(
-                {
-                    "id": tool_call.get("id"),
-                    "type": tool_call.get("type", "function"),
-                    "function": {
-                        "name": tool_call.get("name", ""),
-                        "arguments": json.dumps(tool_call.get("arguments", {})),
-                    },
-                }
-            )
+            normalized_tool_call = self._normalize_tool_call_for_request(raw_tool_call)
+            if normalized_tool_call:
+                normalized_tool_calls.append(normalized_tool_call)
         return normalized_tool_calls
 
     def _stringify_content(self, content: Any) -> str:
@@ -173,17 +164,7 @@ class OpenCodeService(CustomLLMService):
 
             if hasattr(message, "tool_calls") and message.tool_calls:
                 for tool_call in message.tool_calls:
-                    function = tool_call.function
-                    tool_uses.append(
-                        {
-                            "id": getattr(tool_call, "id", None)
-                            or f"toolu_{function.name}_{len(tool_uses)}",
-                            "name": function.name,
-                            "input": json.loads(function.arguments),
-                            "type": tool_call.type,
-                            "response": "",
-                        }
-                    )
+                    self._append_non_stream_tool_call(tool_uses, tool_call)
                 return (
                     content,
                     tool_uses,
@@ -235,53 +216,7 @@ class OpenCodeService(CustomLLMService):
 
             if hasattr(delta, "tool_calls") and delta.tool_calls:
                 for tool_call_delta in delta.tool_calls:
-                    if getattr(tool_call_delta, "id", None):
-                        tool_uses.append(
-                            {
-                                "id": tool_call_delta.id,
-                                "name": getattr(tool_call_delta.function, "name", "")
-                                if hasattr(tool_call_delta, "function")
-                                else "",
-                                "input": {},
-                                "type": "function",
-                                "response": "",
-                            }
-                        )
-                    if not tool_uses:
-                        tool_uses.append(
-                            {
-                                "id": f"toolu_{len(tool_uses)}",
-                                "name": "",
-                                "input": {},
-                                "type": "function",
-                                "response": "",
-                            }
-                        )
-                    tool_call_index = len(tool_uses) - 1
-                    if hasattr(tool_call_delta, "function"):
-                        if (
-                            hasattr(tool_call_delta.function, "name")
-                            and tool_call_delta.function.name
-                        ):
-                            tool_uses[tool_call_index]["name"] = (
-                                tool_call_delta.function.name
-                            )
-                        if (
-                            hasattr(tool_call_delta.function, "arguments")
-                            and tool_call_delta.function.arguments
-                        ):
-                            current_args = tool_uses[tool_call_index].get(
-                                "args_json", ""
-                            )
-                            tool_uses[tool_call_index]["args_json"] = (
-                                current_args + tool_call_delta.function.arguments
-                            )
-                            try:
-                                tool_uses[tool_call_index]["input"] = json.loads(
-                                    tool_uses[tool_call_index]["args_json"]
-                                )
-                            except json.JSONDecodeError:
-                                pass
+                    self._merge_stream_tool_call_delta(tool_uses, tool_call_delta)
 
         if hasattr(chunk, "usage"):
             if hasattr(chunk.usage, "prompt_tokens"):
