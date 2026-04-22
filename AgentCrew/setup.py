@@ -17,7 +17,6 @@ from AgentCrew.modules.memory.context_persistent import ContextPersistenceServic
 from AgentCrew.modules.clipboard import ClipboardService
 from AgentCrew.modules.web_search import TavilySearchService
 from AgentCrew.modules.code_analysis import CodeAnalysisService
-from AgentCrew.modules.image_generation import ImageGenerationService
 from AgentCrew.modules.browser_automation import BrowserAutomationService
 from AgentCrew.modules.agents.manager import AgentManager
 from AgentCrew.modules.agents.local_agent import LocalAgent
@@ -210,26 +209,6 @@ class ApplicationSetup:
             code_analysis_service = None
 
         try:
-            if provider == "openai_codex":
-                image_gen_service = ImageGenerationService(provider="openai_codex")
-            elif os.getenv("OPENAI_API_KEY"):
-                image_gen_service = ImageGenerationService(provider="openai")
-            else:
-                try:
-                    image_gen_service = ImageGenerationService(provider="openai_codex")
-                    click.echo(
-                        "\u2139\ufe0f Image generation using ChatGPT subscription (Codex)."
-                    )
-                except Exception:
-                    image_gen_service = None
-                    click.echo(
-                        "\u26a0\ufe0f Image generation service not available: No API keys found."
-                    )
-        except Exception as e:
-            click.echo(f"\u26a0\ufe0f Image generation service not available: {str(e)}")
-            image_gen_service = None
-
-        try:
             browser_automation_service = BrowserAutomationService()
         except Exception as e:
             click.echo(
@@ -292,7 +271,6 @@ class ApplicationSetup:
             "code_analysis": code_analysis_service,
             "web_search": search_service,
             "context_persistent": context_service,
-            "image_generation": image_gen_service,
             "browser": browser_automation_service,
             "file_editing": file_editing_service,
             "command_execution": command_execution_service,

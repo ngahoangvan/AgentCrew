@@ -32,6 +32,8 @@
   editing, browser automation, memory, and structured outputs.
 - **Keep control**: review tool calls, limit permissions, and choose how much
   autonomy your agents get.
+- **Share reusable agent setups**: start from example agent configs and adapt
+  them to your workflow.
 
 ## What is AgentCrew?
 
@@ -168,7 +170,7 @@ Key details:
   screenshots via Chrome DevTools Protocol
 - **Command Execution**: Run shell commands with monitoring, rate limiting, and
   audit logging for safe system operations
-- **System Integration**: Manage clipboard, generate images with DALL-E
+- **System Integration**: Manage clipboard
 - **Memory Systems**: Remember conversations, retrieve relevant context, forget
   by topic or date range, multiple embedding providers
 - **Voice Interaction**: Speech-to-text input and text-to-speech responses via

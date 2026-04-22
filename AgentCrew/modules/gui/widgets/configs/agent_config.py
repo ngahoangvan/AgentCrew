@@ -49,7 +49,6 @@ class AgentsConfigTab(QWidget):
             "clipboard",
             "code_analysis",
             "web_search",
-            "image_generation",
             "browser",
             "file_editing",
             "command_execution",

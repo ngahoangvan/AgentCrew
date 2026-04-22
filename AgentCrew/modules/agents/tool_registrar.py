@@ -118,12 +118,6 @@ class AgentToolRegistrar:
                         )
 
                         register_web_search(service, agent)
-                    elif tool_name == "image_generation":
-                        from AgentCrew.modules.image_generation.tool import (
-                            register as register_image_generation,
-                        )
-
-                        register_image_generation(service, agent)
                     elif tool_name == "browser":
                         from AgentCrew.modules.browser_automation.tool import (
                             register as register_browser,
