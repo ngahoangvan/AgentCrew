@@ -92,7 +92,7 @@ class GoogleAINativeService(BaseLLMService):
         logger.info("Initialized Google Service")
 
     async def close(self):
-        await self.client.close()
+        self.client.close()
 
     def set_think(self, budget_tokens) -> bool:
         """
@@ -157,13 +157,18 @@ class GoogleAINativeService(BaseLLMService):
         input_tokens = 0
         output_tokens = 0
 
-        async for chunk in self.client.aio.models.generate_content_stream(
-            model=self.model,
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                max_output_tokens=3000, temperature=temperature
-            ),
-        ):
+        stream_generator = GoogleStreamAdapter(
+            self.client.aio.models.generate_content_stream(
+                model=self.model,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    max_output_tokens=3000,
+                    temperature=temperature,
+                    system_instruction=self.system_prompt,
+                ),
+            )
+        )
+        async for chunk in stream_generator:
             if hasattr(chunk, "text") and chunk.text:
                 result_text += chunk.text
             if hasattr(chunk, "usage_metadata") and chunk.usage_metadata:

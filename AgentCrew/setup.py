@@ -319,16 +319,31 @@ class ApplicationSetup:
             if not config_uri:
                 config_uri = "./agents.toml"
             config_uri = os.path.expanduser(config_uri)
-            if not os.path.exists(config_uri):
-                click.echo(
-                    f"Agent configuration not found at {config_uri}. Creating default configuration."
-                )
-                config_dir = os.path.dirname(config_uri)
-                if config_dir:
-                    os.makedirs(config_dir, exist_ok=True)
 
-                escaped_default_prompt = DEFAULT_PROMPT.replace('"""', '\\"\\"\\"')
-                default_config = f'''
+        agent_definitions: list = []
+        try:
+            agent_definitions = AgentManager.load_agents_from_config(config_uri)
+        except FileNotFoundError:
+            pass
+
+        if not agent_definitions and not remoting_provider:
+            from AgentCrew.modules.onboarding import OnboardingService
+
+            onboarding = OnboardingService(services["llm"])
+            if onboarding.should_run(config_uri):
+                if onboarding.run():
+                    agent_definitions = AgentManager.load_agents_from_config(config_uri)
+
+        if not agent_definitions:
+            click.echo(
+                f"Agent configuration not found at {config_uri}. Creating default configuration."
+            )
+            config_dir = os.path.dirname(config_uri)
+            if config_dir:
+                os.makedirs(config_dir, exist_ok=True)
+
+            escaped_default_prompt = DEFAULT_PROMPT.replace('"""', '\\"\\"\\"')
+            default_config = f'''
 [[agents]]
 name = "{DEFAULT_NAME}"
 description = "{DEFAULT_DESCRIPTION}"
@@ -336,12 +351,11 @@ system_prompt = """{escaped_default_prompt}"""
 tools = ["memory", "browser", "web_search", "code_analysis"]
 '''
 
-                with open(config_uri, "w+", encoding="utf-8") as f:
-                    f.write(default_config)
+            with open(config_uri, "w+", encoding="utf-8") as f:
+                f.write(default_config)
 
-                click.echo(f"Created default agent configuration at {config_uri}")
-
-        agent_definitions = AgentManager.load_agents_from_config(config_uri)
+            click.echo(f"Created default agent configuration at {config_uri}")
+            agent_definitions = AgentManager.load_agents_from_config(config_uri)
 
         for agent_def in agent_definitions:
             if agent_def.get("base_url", ""):

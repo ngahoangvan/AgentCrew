@@ -94,10 +94,11 @@ class OpenAIService(BaseLLMService):
             stream=True,
             stream_options={"include_usage": True},
             messages=[
+                {"role": "system", "content": self.system_prompt},
                 {
                     "role": "user",
                     "content": prompt,
-                }
+                },
             ],
         )
 

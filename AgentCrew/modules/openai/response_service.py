@@ -125,7 +125,12 @@ class OpenAIResponseService(BaseLLMService):
 
     async def process_message(self, prompt: str, temperature: float = 0) -> str:
         """Process a single message using Response API with streaming."""
-        request_params = {"model": self.model, "input": prompt, "stream": True}
+        request_params = {
+            "model": self.model,
+            "input": prompt,
+            "stream": True,
+            "instructions": self.system_prompt or None,
+        }
         if self._extra_headers:
             request_params["extra_headers"] = self._extra_headers
 

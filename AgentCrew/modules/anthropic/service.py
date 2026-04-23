@@ -55,6 +55,7 @@ class AnthropicService(BaseLLMService):
             model=self.model,
             temperature=temperature,
             max_tokens=3000,
+            system=self.system_prompt,
             messages=[
                 {
                     "role": "user",

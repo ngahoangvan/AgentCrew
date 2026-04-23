@@ -167,7 +167,10 @@ class TogetherAIService(BaseLLMService):
             max_tokens=3000,
             temperature=temperature,
             stream=True,
-            messages=[{"role": "user", "content": prompt}],
+            messages=[
+                {"role": "system", "content": self.system_prompt},
+                {"role": "user", "content": prompt},
+            ],
         )
 
         async for chunk in stream:

@@ -189,10 +189,11 @@ class CustomLLMService(OpenAIService):
             stream=True,
             stream_options={"include_usage": True},
             messages=[
+                {"role": "system", "content": self.system_prompt},
                 {
                     "role": "user",
                     "content": prompt,
-                }
+                },
             ],
             extra_headers=self.extra_headers,
         )
