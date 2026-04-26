@@ -20,8 +20,8 @@ IMAGE_MIME_TYPES = [
 if TYPE_CHECKING:
     from AgentCrew.modules.llm.base import BaseLLMService
 
-MAX_ITEMS_OUT = 30
-MAX_FILES_TO_ANALYZE = 400
+MAX_ITEMS_OUT = 40
+MAX_FILES_TO_ANALYZE = 200
 
 
 class CodeAnalysisService:
@@ -308,9 +308,10 @@ Based on the following code structure analysis, extract:
 1. **Technology Stack**: Languages, frameworks, key libraries detected
 2. **Architecture Pattern**: How the project is organized (e.g., MVC, modular, monorepo, microservices)
 3. **Naming Conventions**: File naming, module naming, any patterns observed
-4. **Key Entry Points**: Main files, configuration files, app bootstrapping
-5. **Development Patterns**: Dependency injection, service layers, middleware patterns, etc.
-6. **Project-Specific Rules**: Any conventions that a developer MUST follow when working on this codebase (e.g., where to place new files, how modules are registered, import patterns)
+4. **Terminologies**: Extract and formalize domain terminology from the current analysis into a consistent glossary.
+5. **Key Entry Points**: Main files, configuration files, app bootstrapping
+6. **Development Patterns**: Dependency injection, service layers, middleware patterns, etc.
+7. **Project-Specific Rules**: Any conventions that a developer MUST follow when working on this codebase (e.g., where to place new files, how modules are registered, import patterns)
 
 Code Structure Analysis:
 {analysis_result}

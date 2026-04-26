@@ -39,6 +39,10 @@ def get_code_analysis_tool_definition() -> Dict[str, Any]:
             "type": "string",
             "description": "Optional focused feature scope used to prioritize the most relevant files during repository analysis. Example: 'authentication flow', 'delegate parallel execution', or 'browser automation console logs'.",
         },
+        "deep_analysis": {
+            "type": "boolean",
+            "description": "When true, include project notes (rules, conventions, patterns) extracted in the tool result. When false, skip project notes for faster analysis. Default is false.",
+        },
     }
     tool_required = ["path"]
 
@@ -70,24 +74,32 @@ def get_code_analysis_tool_handler(
 
         exclude_patterns = params.get("exclude_patterns", [])
         feature_scope = params.get("feature_scope")
+        deep_analysis = params.get("deep_analysis", False)
         result = await code_analysis_service.analyze_code_structure(
             path, exclude_patterns, feature_scope=feature_scope
         )
         if isinstance(result, dict):
             raise Exception(f"Failed to analyze code: {result.get('error', '')}")
 
-        project_notes = await code_analysis_service.extract_project_notes(result, path)
-
-        return [
+        output = [
             {
                 "type": "text",
                 "text": result,
             },
-            {
-                "type": "text",
-                "text": f"===PROJECT NOTES & RULES===\n{project_notes}\n\nUse the above project notes to adapt your project behaviors accordingly. Call learn_behavior with scope 'project' for key patterns you identify.",
-            },
         ]
+
+        if deep_analysis:
+            project_notes = await code_analysis_service.extract_project_notes(
+                result, path
+            )
+            output.append(
+                {
+                    "type": "text",
+                    "text": f"===PROJECT NOTES & RULES===\n{project_notes}\n\nUse the above project notes to adapt your project behaviors accordingly. Call learn_behavior with scope 'project' for key patterns you identify.",
+                }
+            )
+
+        return output
 
     return handler
 
