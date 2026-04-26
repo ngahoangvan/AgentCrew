@@ -209,6 +209,16 @@ class ApplicationSetup:
 
         try:
             search_service = TavilySearchService()
+        except ValueError as e:
+            click.echo(
+                f"\u26a0\ufe0f Web search tools not available: {str(e)}\n"
+                "   Without web search, agents cannot look up current information, recent events,\n"
+                "   documentation, or real-time data from the internet.\n"
+                "   \U0001f4a1 Get a free Tavily API key (no credit card, 1,000 calls/month) at:\n"
+                "   https://app.tavily.com/\n"
+                "   Then set it via the TAVILY_API_KEY environment variable or config.json."
+            )
+            search_service = None
         except Exception as e:
             click.echo(f"\u26a0\ufe0f Web search tools not available: {str(e)}")
             search_service = None
@@ -342,7 +352,7 @@ class ApplicationSetup:
         if not agent_definitions and not remoting_provider:
             from AgentCrew.modules.onboarding import OnboardingService
 
-            onboarding = OnboardingService(services["llm"])
+            onboarding = OnboardingService(services["llm"], services=services)
             if onboarding.should_run(config_uri):
                 if onboarding.run():
                     agent_definitions = AgentManager.load_agents_from_config(config_uri)

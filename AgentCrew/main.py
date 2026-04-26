@@ -494,7 +494,7 @@ def create_agent_command(
     services = setup.setup_services(
         detected_provider, memory_llm=memory_llm, need_memory=False, with_voice=False
     )
-    onboarding = OnboardingService(services["llm"])
+    onboarding = OnboardingService(services["llm"], services=services)
     success = onboarding.create_agent(name=name, description=description)
     if not success:
         raise SystemExit(1)

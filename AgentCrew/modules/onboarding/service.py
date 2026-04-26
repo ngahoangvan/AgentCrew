@@ -17,7 +17,10 @@ from rich.panel import Panel
 from rich.text import Text
 from rich.markdown import Markdown
 
+from AgentCrew.modules.agents.agent_runner import run_agent_loop
+from AgentCrew.modules.agents.local_agent import LocalAgent
 from AgentCrew.modules.config.agents_config import AgentsConfig
+from AgentCrew.modules.web_search.tool import register as register_web_search
 
 _ONBOARDING_SYSTEM_PROMPT = """
 ## Agent Identity
@@ -121,61 +124,53 @@ Expert_Systems:
 
 ### Technique Reference Guide
 
+ALWAYS use search_web or fetch_webpage when external research would improve the agent design, especially for current domains, frameworks, libraries, compliance rules, or prompting techniques.
 ALWAYS fetch the technique url to deeply understand the technique
 
 1. Zero-Shot Prompting
-- **What it is**: Directly instruct the model to perform a task without any examples or demonstrations. The model relies entirely on its pre-trained knowledge and instruction-following capabilities.
-- **When to use**: Well-defined tasks with clear success criteria; tasks the model is likely already trained on; when token budget is constrained; for straightforward classification, extraction, or transformation tasks.
-- **How to implement**: Provide a clear role definition, precise task specification, and explicit output format. Use strong action verbs and unambiguous language.
-- **Optimization**: Include role definition, task specification, output format. If zero-shot fails, escalate to few-shot prompting rather than adding more instructions.
+- **Link**: https://www.promptingguide.ai/techniques/zeroshot
+- **Strategic Use**: Well-defined tasks, clear success criteria, capable models
+- **Optimization**: Include role definition, task specification, output format
 
 2. Few-Shot Prompting
-- **What it is**: Provide demonstrations (examples) in the prompt to steer the model toward better performance through in-context learning. The demonstrations serve as conditioning for subsequent responses.
-- **When to use**: Format consistency is critical; domain-specific tasks; example-driven learning scenarios; when zero-shot produces inconsistent results; tasks requiring specific output patterns or styles.
-- **How to implement**: Include 2-5 diverse, representative examples that cover edge cases. Maintain consistent formatting across all examples. Ensure the label space and input distribution match the target task.
-- **Optimization**: Diverse, representative examples; consistent formatting. The format matters more than label accuracy — even random labels with correct format outperform no examples. Increase shot count for more difficult tasks.
+- **Link**: https://www.promptingguide.ai/techniques/fewshot
+- **Strategic Use**: Format consistency, domain-specific tasks, example-driven learning
+- **Optimization**: Diverse, representative examples; consistent formatting
 
 3. Chain-of-Thought (CoT)
-- **What it is**: Enable complex reasoning by prompting the model to generate intermediate reasoning steps before arriving at the final answer. Combines naturally with few-shot prompting.
-- **When to use**: Multi-step arithmetic or mathematical problems; commonsense reasoning; symbolic logic; logical deduction tasks; any problem where the path to the answer matters more than the answer alone.
-- **How to implement**: For zero-shot CoT, append "Let's think step by step." For few-shot CoT, provide exemplars that show explicit reasoning traces leading to the answer. Break the problem into explicit intermediate steps.
-- **Optimization**: "Let's think step by step" for zero-shot; explicit reasoning in examples for few-shot. CoT is an emergent ability — it works best with sufficiently capable models. Combine with self-consistency for maximum accuracy.
+- **Link**: https://www.promptingguide.ai/techniques/cot
+- **Strategic Use**: Multi-step reasoning, mathematical problems, logical deduction
+- **Optimization**: "Let's think step by step" for zero-shot; explicit reasoning in examples
 
 4. Meta Prompting
-- **What it is**: Focus on the structural and syntactical aspects of tasks rather than specific content details. Uses abstract, reusable prompt structures that emphasize form and pattern over content.
-- **When to use**: Token efficiency is critical; complex instructions that would otherwise be too long; bias reduction through abstraction; theoretical or mathematical problem-solving; coding challenges; when building reusable prompt templates.
-- **How to implement**: Define the structure, syntax, and pattern of the expected response rather than giving content-specific examples. Use type-theory-inspired categorization and logical arrangement of components.
-- **Optimization**: Abstract, reusable prompt structures; clear format definitions. Meta prompting is structure-oriented, not content-driven — provide the "shape" of the solution, not specific instances. Particularly effective for XML or schema-based outputs.
+- **Link**: https://www.promptingguide.ai/techniques/meta-prompting
+- **Strategic Use**: Token efficiency, complex instructions, bias reduction
+- **Optimization**: Abstract, reusable prompt structures; clear format definitions
 
 5. Self-Consistency
-- **What it is**: Sample multiple diverse reasoning paths through CoT prompting, then select the most consistent answer across all paths. Replaces naive greedy decoding with majority voting.
-- **When to use**: High-accuracy requirements; ambiguous problems where a single reasoning path might fail; arithmetic reasoning; commonsense reasoning; any task where multiple valid approaches exist and consensus improves reliability.
-- **How to implement**: Generate the same CoT prompt multiple times (e.g., 3-10 samples) with temperature > 0 to encourage diversity. Extract the final answer from each path and select the answer that appears most frequently.
-- **Optimization**: Multiple reasoning paths; majority voting on solutions. Combine with CoT for best results. More samples increase accuracy but increase cost — 3-5 samples often provides a good balance.
+- **Link**: https://www.promptingguide.ai/techniques/consistency
+- **Strategic Use**: High-accuracy requirements, ambiguous problems
+- **Optimization**: Multiple reasoning paths; majority voting on solutions
 
 6. Prompt Chaining
-- **What it is**: Break complex tasks into subtasks, then chain prompts where the output of one prompt becomes the input to the next. Each link performs a transformation or additional process.
-- **When to use**: Complex projects that a single detailed prompt cannot handle reliably; multi-stage workflows; document question-answering; data processing pipelines; tasks requiring intermediate validation or cleanup.
-- **How to implement**: Identify natural subtask boundaries. Design each prompt to accept the previous output as input. Include validation steps between chains. Make each prompt single-purpose and focused.
-- **Optimization**: Clear handoff protocols; intermediate result validation. Example chain: (1) Extract relevant quotes → (2) Synthesize answer from quotes → (3) Format and validate final response. Debug each link independently.
+- **Link**: https://www.promptingguide.ai/techniques/prompt_chaining
+- **Strategic Use**: Multi-stage workflows, complex projects, verification needs
+- **Optimization**: Clear handoff protocols; intermediate result validation
 
-7. Tree of Thought (ToT)
-- **What it is**: Maintain a tree of intermediate reasoning paths (thoughts) and explore them systematically with search algorithms (BFS/DFS). Generalizes CoT by enabling exploration, lookahead, and backtracking.
-- **When to use**: Creative problem-solving with multiple solution paths; strategic planning; game-playing; mathematical exploration; tasks requiring deliberate reasoning and evaluation of alternatives; problems where early wrong steps derail the entire answer.
-- **How to implement**: Decompose the problem into discrete thought steps. At each step, generate multiple candidate continuations. Evaluate each candidate (e.g., sure/maybe/impossible). Prune poor candidates and continue exploring promising branches.
-- **Optimization**: Structured exploration paths; evaluation criteria for branches. Define the number of candidates per step and the total number of steps based on task complexity. Use self-evaluation to prune branches early. For simple implementations, use the "panel of experts" approach.
+7. Tree of Thought
+- **Link**: https://www.promptingguide.ai/techniques/tot
+- **Strategic Use**: Creative problem-solving, multiple solution exploration
+- **Optimization**: Structured exploration paths; evaluation criteria for branches
 
 8. ReAct (Reasoning + Acting)
-- **What it is**: Interleave reasoning traces (Thought) with task-specific actions (Act) and observations (Observation). The model reasons about what to do, performs an action, observes the result, then reasons again.
-- **When to use**: Tool usage and orchestration; research tasks requiring information retrieval; systematic investigation; tasks where the model must interact with external environments (databases, APIs, search engines); multi-hop question answering.
-- **How to implement**: Structure the prompt with explicit Thought/Action/Observation steps. Define available actions and their expected formats. After each action, provide the observation from the environment. Continue the loop until the task is complete.
-- **Optimization**: Clear tool descriptions; action-observation loops. Best results come from combining ReAct with CoT (internal knowledge + external information). Ensure actions have well-defined inputs and outputs. Handle failed or uninformative observations gracefully.
+- **Link**: https://www.promptingguide.ai/techniques/react
+- **Strategic Use**: Tool usage, research tasks, systematic investigation
+- **Optimization**: Clear tool descriptions; action-observation loops
 
 9. Reflexion
-- **What it is**: A framework for reinforcing agents through linguistic feedback. Converts environmental feedback into self-reflection, which is stored in memory and provided as context for future trials.
-- **When to use**: Learning from errors over multiple attempts; iterative improvement; sequential decision-making; programming tasks; reasoning tasks where trial-and-error learning is beneficial; when explicit memory of past mistakes improves performance.
-- **How to implement**: Define the Actor (generates actions, can use CoT or ReAct), Evaluator (scores outputs with reward signals), and Self-Reflection (generates verbal reinforcement cues). Store reflections in episodic memory. On each new trial, provide relevant past reflections as context.
-- **Optimization**: Explicit error analysis; improvement strategies. Start with a simple sliding-window memory of recent reflections. For complex tasks, consider vector-based retrieval of relevant past reflections. Combine with ReAct for state-of-the-art agent performance.
+- **Link**: https://www.promptingguide.ai/techniques/reflexion
+- **Strategic Use**: Learning from errors, iterative improvement, complex problem-solving
+- **Optimization**: Explicit error analysis; improvement strategies
 
 ## TOML Output Format (Phase 2 ONLY)
 
@@ -216,9 +211,15 @@ _ONBOARDING_STYLE = Style.from_dict(
 class OnboardingService:
     """Guides new users through creating their first agent interactively."""
 
-    def __init__(self, llm_service: Any, agents_config: Optional[AgentsConfig] = None):
+    def __init__(
+        self,
+        llm_service: Any,
+        agents_config: Optional[AgentsConfig] = None,
+        services: Optional[Dict[str, Any]] = None,
+    ):
         self.llm_service = llm_service
         self.agents_config = agents_config or AgentsConfig()
+        self.services = services or {}
         self.console = Console()
         if self.llm_service:
             if self.llm_service.provider_name == "google":
@@ -426,7 +427,9 @@ class OnboardingService:
             )
 
             original_system_prompt = getattr(self.llm_service, "system_prompt", None)
-            self.llm_service.set_system_prompt(_ONBOARDING_SYSTEM_PROMPT)
+            original_tools = self._copy_llm_attribute("tools")
+            original_tool_handlers = self._copy_llm_attribute("tool_handlers")
+            onboarding_agent = self._build_onboarding_agent()
 
             try:
                 conversation: list = []
@@ -434,12 +437,8 @@ class OnboardingService:
 
                 for _ in range(max_turns):
                     prompt = self._build_chat_prompt(initial_message, conversation)
-                    response = await self.llm_service.process_message(
-                        prompt, temperature=1.0
-                    )
-
-                    result_text = (
-                        response[0] if isinstance(response, tuple) else response
+                    result_text = await self._generate_onboarding_response(
+                        onboarding_agent, prompt
                     )
                     if not isinstance(result_text, str):
                         return None
@@ -467,6 +466,8 @@ class OnboardingService:
                 return None
 
             finally:
+                self._restore_llm_attribute("tools", original_tools)
+                self._restore_llm_attribute("tool_handlers", original_tool_handlers)
                 if original_system_prompt is not None:
                     self.llm_service.set_system_prompt(original_system_prompt)
                 else:
@@ -475,6 +476,40 @@ class OnboardingService:
         except Exception as e:
             logger.warning("LLM agent generation failed: " + str(e))
             return None
+
+    def _build_onboarding_agent(self) -> LocalAgent:
+        onboarding_agent = LocalAgent(
+            name="AgentCreator",
+            description="Creates AgentCrew agent definitions with web research support",
+            llm_service=self.llm_service,
+            services={},
+            tools=[],
+            temperature=1.0,
+        )
+        onboarding_agent.set_system_prompt(_ONBOARDING_SYSTEM_PROMPT)
+        search_service = self.services.get("web_search")
+        if search_service:
+            register_web_search(search_service, onboarding_agent)
+            onboarding_agent._register_tools_with_llm()
+        return onboarding_agent
+
+    async def _generate_onboarding_response(
+        self, onboarding_agent: LocalAgent, prompt: str
+    ) -> Optional[str]:
+        history = [{"role": "user", "content": [{"type": "text", "text": prompt}]}]
+        return await run_agent_loop(onboarding_agent, history)
+
+    def _copy_llm_attribute(self, name: str) -> Any:
+        value = getattr(self.llm_service, name, None)
+        if isinstance(value, list):
+            return list(value)
+        if isinstance(value, dict):
+            return dict(value)
+        return value
+
+    def _restore_llm_attribute(self, name: str, value: Any) -> None:
+        if value is not None and hasattr(self.llm_service, name):
+            setattr(self.llm_service, name, value)
 
     def _print_assistant_message(self, text: str) -> None:
         self.console.print("")
