@@ -120,7 +120,11 @@ class TaskExecutionEngine:
             task_history = await self.store.get_task_history(task.context_id)
             retried_count = [0]
 
-            current_response = await self._process_task(
+            (
+                current_response,
+                total_input_tokens,
+                total_output_tokens,
+            ) = await self._process_task(
                 agent, task, task_history, artifacts, retried_count
             )
 
@@ -132,7 +136,13 @@ class TaskExecutionEngine:
                 return
 
             await self._finalize_task(
-                agent, task, current_response, artifacts, task_history
+                agent,
+                task,
+                current_response,
+                artifacts,
+                task_history,
+                input_tokens=total_input_tokens,
+                output_tokens=total_output_tokens,
             )
 
         except TaskCanceledException:
@@ -173,15 +183,15 @@ class TaskExecutionEngine:
         task_history: List[Dict[str, Any]],
         artifacts: List[Any],
         retried_count: List[int],
-    ) -> str:
+        input_tokens=0,
+        output_tokens=0,
+    ) -> tuple[str, int, int]:
         try:
             current_response = ""
             response_message = ""
             thinking_content = ""
             thinking_signature = ""
             tool_uses: List[Dict[str, Any]] = []
-            input_tokens = 0
-            output_tokens = 0
 
             def process_result(_tool_uses, _input_tokens, _output_tokens):
                 nonlocal tool_uses, input_tokens, output_tokens
@@ -269,13 +279,19 @@ class TaskExecutionEngine:
                 )
 
                 if tool_call_result == ToolCallResult.INPUT_REQUIRED:
-                    return ""
+                    return "", input_tokens, output_tokens
 
                 return await self._process_task(
-                    agent, task, task_history, artifacts, retried_count
+                    agent,
+                    task,
+                    task_history,
+                    artifacts,
+                    retried_count,
+                    input_tokens,
+                    output_tokens,
                 )
 
-            return current_response
+            return current_response, input_tokens, output_tokens
 
         except Exception as e:
             if isinstance(e, TaskCanceledException):
@@ -295,7 +311,13 @@ class TaskExecutionEngine:
                         agent.input_tokens_usage = max_token
                         retried_count[0] += 1
                         return await self._process_task(
-                            agent, task, task_history, artifacts, retried_count
+                            agent,
+                            task,
+                            task_history,
+                            artifacts,
+                            retried_count,
+                            input_tokens,
+                            output_tokens,
                         )
             raise
 
@@ -472,6 +494,8 @@ class TaskExecutionEngine:
         current_response: str,
         artifacts: List[Any],
         task_history: List[Dict[str, Any]],
+        input_tokens: int = 0,
+        output_tokens: int = 0,
     ) -> None:
         if current_response.strip():
             assistant_message = agent.format_message(
@@ -512,6 +536,10 @@ class TaskExecutionEngine:
                     context_id=task.context_id,
                     status=task.status,
                     final=True,
+                    metadata={
+                        "input_tokens": input_tokens,
+                        "output_tokens": output_tokens,
+                    },
                 ),
             )
             await self.streaming.signal_end(task.id)
