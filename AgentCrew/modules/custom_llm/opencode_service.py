@@ -151,7 +151,7 @@ class OpenCodeService(CustomLLMService):
         self.current_input_tokens = 0
         output_tokens = self.current_output_tokens
         self.current_output_tokens = 0
-        thinking_data = ("", None)
+        thinking_data = (" ", None) if self.model.startswith("deepseek-v4") else None
 
         if hasattr(chunk, "message"):
             message = chunk.message
@@ -198,7 +198,7 @@ class OpenCodeService(CustomLLMService):
         chunk_text = ""
         input_tokens = 0
         output_tokens = 0
-        thinking_content = ""
+        thinking_content = " " if self.model.startswith("deepseek-v4") else None
 
         if chunk.choices and len(chunk.choices) > 0:
             delta = chunk.choices[0].delta
@@ -230,5 +230,5 @@ class OpenCodeService(CustomLLMService):
             input_tokens,
             output_tokens,
             chunk_text or None,
-            (thinking_content, None),
+            (thinking_content, None) if thinking_content else None,
         )
