@@ -66,27 +66,33 @@ def ask_tool_prompt() -> str:
     return """
 <Ask_Tool_Instruction>
   <Purpose>
-    Use the `ask` tool when you need additional information or clarification from the user 
-    to complete their request effectively. This tool helps you gather specific details 
+    Use the `ask` tool when you need additional information or clarification from the user
+    to complete their request effectively. This tool helps you gather specific details
     through structured questioning with guided answer options.
+
+    When the user presents a plan, design, architecture, or proposal, use the `ask` tool
+    to stress-test it through a focused interview until every important branch of the
+    decision tree is resolved and both sides reach a shared understanding.
   </Purpose>
-  
+
   <When_To_Use>
     - User request is ambiguous or lacks critical details
     - Multiple valid approaches exist and user preference is needed
     - Confirmation is required before proceeding with a significant action
     - Technical specifications or constraints need clarification
     - Choice between options cannot be determined from context
+    - User presents a plan, design, architecture, proposal, or says they want to be grilled
   </When_To_Use>
-  
+
   <Best_Practices>
-    - Ask ONE specific question at a time
     - Provide 3-6 guided answers that cover common scenarios
     - Make guided answers clear, concise, and mutually exclusive
     - Frame questions positively and professionally
     - Ensure guided answers are actionable and relevant
     - Prevent custom answer or user specify option
     - Always use plain text
+    - Ask the smallest useful next question instead of bundling multiple decisions together
+    - Prefer a recommended answer that keeps the solution simple, consistent, and low-risk
   </Best_Practices>
 </Ask_Tool_Instruction>
 """
