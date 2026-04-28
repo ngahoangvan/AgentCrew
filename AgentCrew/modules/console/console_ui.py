@@ -226,6 +226,10 @@ class ConsoleUI(Observer):
                 Text("🎮 Chat history cleared.", style=RICH_STYLE_YELLOW_BOLD)
             )
             self.display_handlers.clear_files()
+            self.session_cost = 0
+            self._input_tokens = 0
+            self._output_tokens = 0
+            self._total_cost = 0
         elif event == "copy_requested":
             self.copy_to_clipboard(data)  # data is the text to copy
         elif event == "debug_requested":
@@ -274,6 +278,17 @@ class ConsoleUI(Observer):
             self.display_handlers.display_message(jump_text)
             self.display_handlers.display_message(preview_text)
             self.input_handler.set_current_buffer(data["message"])
+        elif event == "fork_and_switch_performed":
+            fork_text = Text(
+                f"🍴 Forked at turn {data['turn_number']}...\n",
+                style=RICH_STYLE_YELLOW_BOLD,
+            )
+            preview_text = Text("Switched to fork: ", style=RICH_STYLE_YELLOW)
+            preview_text.append(data["preview"])
+            self._clear_and_reprint_chat()
+
+            self.display_handlers.display_message(fork_text)
+            self.display_handlers.display_message(preview_text)
         elif event == "evolution_summary_ready":
             self.ui_effects.stop_evolution_animation()
             self.display_handlers.display_evolution_summary(data)
@@ -358,10 +373,10 @@ class ConsoleUI(Observer):
             self.display_handlers.display_message(loaded_text)
         elif event == "conversation_saved":
             logger.info(f"Conversation saved: {data.get('id', 'N/A')}")
-        elif event == "clear_requested":
-            self.session_cost = 0.0
         elif event == "update_token_usage":
-            self._calculate_token_usage(data["input_tokens"], data["output_tokens"])
+            self._input_tokens = data.get("input_tokens", 0)
+            self._output_tokens = data.get("output_tokens", 0)
+            self._calculate_token_usage(self._input_tokens, self._output_tokens)
         elif event == "voice_recording_started":
             self.display_handlers.display_message(
                 Text("Start recording. Press Enter to stop...", style="bold yellow")
@@ -805,6 +820,9 @@ class ConsoleUI(Observer):
 
                     if assistant_response:
                         # Calculate and display token usage
+                        self._calculate_token_usage(
+                            self._input_tokens, self._output_tokens
+                        )
                         self.display_token_usage(
                             self._input_tokens,
                             self._output_tokens,
