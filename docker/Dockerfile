@@ -49,6 +49,8 @@ RUN . /opt/venv/bin/activate && \
 # Production stage
 FROM python:3.12-slim
 
+LABEL author=daltonnyx
+
 # Set environment variables
 ENV PYTHONUNBUFFERED=1 \
   PYTHONDONTWRITEBYTECODE=1 \
