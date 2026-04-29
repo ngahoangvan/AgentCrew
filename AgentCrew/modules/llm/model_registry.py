@@ -34,7 +34,7 @@ class ModelRegistry:
         model = registry.get_model(mode_id)
         if not model:
             logger.warning(f"Model not found in registry: {mode_id}")
-            return []
+            return ["tool_use", "stream"]
         return model.capabilities
 
     @classmethod
