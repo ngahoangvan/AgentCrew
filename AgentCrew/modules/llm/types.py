@@ -16,16 +16,7 @@ class Model(BaseModel):
     """Model metadata class."""
 
     id: str
-    provider: Literal[
-        "claude",
-        "openai",
-        "openai_codex",
-        "google",
-        "deepinfra",
-        "together",
-        "opencode_go",
-        "github_copilot",
-    ]
+    provider: str
     name: str
     description: str
     capabilities: List[
