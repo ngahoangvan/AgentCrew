@@ -108,7 +108,7 @@ class ConfirmationHandler:
 
         if response == "Custom your answer":
             custom_answer = self.input_handler.get_prompt_input(
-                "Input your answer(Alt+Enter to submit):"
+                "Input your answer (Alt+Enter or Ctrl+S to submit):"
             )
             message_handler.resolve_tool_confirmation(
                 confirmation_id, {"action": "answer", "answer": custom_answer}
@@ -173,7 +173,7 @@ class ConfirmationHandler:
             )
         elif response == choices[1]:
             deny_reason = self.input_handler.get_prompt_input(
-                "Please tell me why you are denying this tool(Alt+Enter to submit): "
+                "Please tell me why you are denying this tool (Alt+Enter or Ctrl+S to submit): "
             )
             message_handler.resolve_tool_confirmation(
                 confirmation_id, {"action": "deny", "reason": deny_reason}

@@ -324,6 +324,11 @@ class InputHandler:
             event.current_buffer.text = ""
             event.current_buffer.validate_and_handle()
 
+        @kb.add(Keys.ControlS)
+        def _(event):
+            """Submit on Ctrl+S."""
+            event.current_buffer.validate_and_handle()
+
         return prompt(
             HTML(f"<ansiblue>{prompt_message}</ansiblue> "),
             default=default,

@@ -513,9 +513,15 @@ class OnboardingService:
 
     def _ask_onboarding_input(self) -> Optional[str]:
         kb = self._kb_skip()
+
+        @kb.add(Keys.ControlS)
+        def _(event):
+            """Submit on Ctrl+S."""
+            event.current_buffer.validate_and_handle()
+
         result = prompt(
             HTML(
-                "<ansigreen>Your answer</ansigreen> <ansigrey>(type 'skip' to cancel, Alt+Enter to submit)</ansigrey>\n"
+                "<ansigreen>Your answer</ansigreen> <ansigrey>(type 'skip' to cancel, Alt+Enter or Ctrl+S to submit)</ansigrey>\n"
             ),
             key_bindings=kb,
             multiline=True,

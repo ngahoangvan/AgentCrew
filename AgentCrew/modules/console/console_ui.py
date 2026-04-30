@@ -304,7 +304,7 @@ class ConsoleUI(Observer):
                 )
             elif choice == "edit":
                 edited_summary = self.input_handler.get_prompt_input(
-                    "Edit approved summary(Alt+Enter to submit):",
+                    "Edit approved summary (Alt+Enter or Ctrl+S to submit):",
                     default=data.get("user_editable_summary", ""),
                 )
                 if edited_summary.strip():
