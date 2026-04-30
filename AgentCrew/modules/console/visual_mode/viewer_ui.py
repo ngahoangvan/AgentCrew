@@ -32,6 +32,7 @@ class VisualModeUI:
         self.console = console
         self._messages: List[Dict[str, Any]] = []
         self._lines: List[Tuple[str, str, int]] = []
+        self._line_styles: List[Any] = []
         self._cursor_line = 0
         self._cursor_col = 0
         self._scroll_offset = 0
@@ -45,6 +46,7 @@ class VisualModeUI:
         self._search_query = ""
         self._search_matches: List[Tuple[int, int]] = []
         self._current_match_idx = -1
+        self._cached_search_set: set = set()
 
     @property
     def total_lines(self) -> int:
@@ -78,6 +80,7 @@ class VisualModeUI:
         self._search_query = ""
         self._search_matches = []
         self._current_match_idx = -1
+        self._cached_search_set = set()
 
     def _extract_content(self, message: Dict[str, Any]) -> str:
         content = message.get("content", "")
@@ -96,6 +99,7 @@ class VisualModeUI:
 
     def _build_lines(self):
         self._lines = []
+        self._line_styles = []
         for msg_idx, msg in enumerate(self._messages):
             role = msg.get("role", "unknown")
             if role == "tool":
@@ -105,16 +109,26 @@ class VisualModeUI:
             if not content.strip():
                 continue
 
+            if role == "user":
+                header_style = RICH_STYLE_BLUE_BOLD
+            elif role == "assistant":
+                header_style = RICH_STYLE_GREEN_BOLD
+            else:
+                header_style = RICH_STYLE_YELLOW_BOLD
+
             header = f"--- {role.upper()}"
             if agent:
                 header += f" ({agent})"
             header += " ---"
             self._lines.append((header, role, msg_idx))
+            self._line_styles.append(header_style)
 
             for line in content.split("\n"):
                 self._lines.append((line, role, msg_idx))
+                self._line_styles.append("white")
 
             self._lines.append(("", role, msg_idx))
+            self._line_styles.append("white")
 
     def start_search_mode(self):
         self._search_mode = True
@@ -128,6 +142,7 @@ class VisualModeUI:
             self._search_query = ""
             self._search_matches = []
             self._current_match_idx = -1
+            self._cached_search_set = set()
 
     def append_search_char(self, char: str):
         self._search_query += char
@@ -141,13 +156,17 @@ class VisualModeUI:
     def _perform_search(self):
         self._search_matches = []
         self._current_match_idx = -1
+        self._cached_search_set = set()
         if not self._search_query:
             return
 
         pattern = re.escape(self._search_query.lower())
+        query_len = len(self._search_query)
         for line_idx, (line_text, _, _) in enumerate(self._lines):
             for match in re.finditer(pattern, line_text.lower()):
                 self._search_matches.append((line_idx, match.start()))
+                for c in range(match.start(), match.start() + query_len):
+                    self._cached_search_set.add((line_idx, c))
 
         if self._search_matches:
             self._current_match_idx = 0
@@ -395,13 +414,6 @@ class VisualModeUI:
         end_line = min(self._scroll_offset + self.viewport_height, self.total_lines)
         visible_width = self.viewport_width - 6
 
-        search_set = set()
-        if self._search_query and self._search_matches:
-            query_len = len(self._search_query)
-            for match_line, match_col in self._search_matches:
-                for c in range(match_col, match_col + query_len):
-                    search_set.add((match_line, c))
-
         sel_start = None
         sel_end = None
         if self._selection_start is not None and self._selection_end is not None:
@@ -413,18 +425,8 @@ class VisualModeUI:
             sel_end = (e_line, e_col)
 
         for i in range(self._scroll_offset, end_line):
-            line_text, role, _ = self._lines[i]
-            is_header = line_text.startswith("---") and line_text.endswith("---")
-
-            if is_header:
-                if role == "user":
-                    base_style = RICH_STYLE_BLUE_BOLD
-                elif role == "assistant":
-                    base_style = RICH_STYLE_GREEN_BOLD
-                else:
-                    base_style = RICH_STYLE_YELLOW_BOLD
-            else:
-                base_style = "white"
+            line_text, _, _ = self._lines[i]
+            base_style = self._line_styles[i]
 
             line_num = f"{i + 1:4d} "
             content.append(line_num, style=RICH_STYLE_GRAY)
@@ -439,7 +441,7 @@ class VisualModeUI:
                 segment_start = 0
                 current_style = None
 
-                for col_idx, char in enumerate(visible_text):
+                for col_idx, _ in enumerate(visible_text):
                     actual_col = self._horizontal_scroll + col_idx
                     is_cursor = (
                         i == self._cursor_line and actual_col == self._cursor_col
@@ -454,7 +456,7 @@ class VisualModeUI:
                             is_selected = actual_col <= sel_end[1]
                         elif sel_start[0] < i < sel_end[0]:
                             is_selected = True
-                    is_match = (i, actual_col) in search_set
+                    is_match = (i, actual_col) in self._cached_search_set
 
                     if is_cursor:
                         char_style = "reverse"
@@ -595,11 +597,10 @@ class VisualModeUI:
         self._live = Live(
             self._layout,
             console=self.console,
-            auto_refresh=False,
+            refresh_per_second=10,
             screen=True,
         )
         self._live.start()
-        self._live.refresh()
 
     def stop_live(self):
         if self._live:

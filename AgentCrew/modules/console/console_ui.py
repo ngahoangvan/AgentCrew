@@ -640,8 +640,8 @@ class ConsoleUI(Observer):
                         continue
 
                     elif user_input.strip() == "/visual":
-                        self.input_handler._stop_input_thread()
                         try:
+                            self.input_handler._stop_input_thread()
                             from .visual_mode import VisualModeViewer
 
                             viewer = VisualModeViewer(

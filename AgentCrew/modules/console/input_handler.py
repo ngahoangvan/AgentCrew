@@ -51,6 +51,7 @@ class InputHandler:
         self._input_queue = queue.Queue()
         self._input_thread = None
         self._input_stop_event = Event()
+        self._input_thread_lock = threading.Lock()
         self._current_prompt_session = None
         self._last_ctrl_c_time = 0
         self.is_message_processing = False
@@ -382,32 +383,45 @@ class InputHandler:
 
     def _start_input_thread(self):
         """Start the input thread if not already running."""
-        if self._input_thread is None or not self._input_thread.is_alive():
+        with self._input_thread_lock:
+            if self._input_thread is not None and self._input_thread.is_alive():
+                self._stop_input_thread_locked()
             self._input_stop_event.clear()
             self._input_thread = Thread(target=self._input_thread_worker, daemon=True)
             self._input_thread.start()
 
     def _stop_input_thread(self):
         """Stop the input thread cleanly."""
-        if self._input_thread and self._input_thread.is_alive():
-            # Don't try to join if we're in the same thread
-            if threading.current_thread() == self._input_thread:
-                # We're in the input thread, just set the stop event
-                self._input_stop_event.set()
-                return
+        with self._input_thread_lock:
+            self._stop_input_thread_locked()
 
+    def _stop_input_thread_locked(self):
+        """Internal stop implementation — caller must hold _input_thread_lock."""
+        if not self._input_thread or not self._input_thread.is_alive():
+            return
+
+        if threading.current_thread() == self._input_thread:
             self._input_stop_event.set()
-            if self._current_prompt_session:
-                # Try to interrupt the current prompt session
-                try:
-                    if (
-                        hasattr(self._current_prompt_session, "app")
-                        and self._current_prompt_session.app
-                    ):
-                        self._current_prompt_session.app.exit()
-                except Exception:
-                    pass
-            self._input_thread.join(timeout=1.0)
+            return
+
+        self._input_stop_event.set()
+        if self._current_prompt_session:
+            try:
+                if (
+                    hasattr(self._current_prompt_session, "app")
+                    and self._current_prompt_session.app
+                ):
+                    self._current_prompt_session.app.exit()
+            except Exception:
+                pass
+
+        self._input_thread.join(timeout=1.5)
+
+        if self._input_thread.is_alive():
+            logger.warning(
+                "Input thread did not stop within 3s timeout — "
+                "forcing continuation. Old thread may compete for stdin."
+            )
 
     def set_current_buffer(self, content: str):
         self._jumped_user_message = content

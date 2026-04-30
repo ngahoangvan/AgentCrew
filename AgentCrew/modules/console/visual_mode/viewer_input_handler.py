@@ -34,37 +34,45 @@ class VisualModeInputHandler:
         @kb.add("k")
         def _(event):
             if self._ui._search_mode:
+                self._ui.append_search_char("k")
+                self._ui.render()
                 return
             self._g_pressed = False
-            if self._ui.move_cursor("up"):
-                self._ui.render()
+            self._ui.move_cursor("up")
+            self._ui.render()
 
         @kb.add(Keys.Down)
         @kb.add("j")
         def _(event):
             if self._ui._search_mode:
+                self._ui.append_search_char("j")
+                self._ui.render()
                 return
             self._g_pressed = False
-            if self._ui.move_cursor("down"):
-                self._ui.render()
+            self._ui.move_cursor("down")
+            self._ui.render()
 
         @kb.add(Keys.Left)
         @kb.add("h")
         def _(event):
             if self._ui._search_mode:
+                self._ui.append_search_char("h")
+                self._ui.render()
                 return
             self._g_pressed = False
-            if self._ui.move_cursor("left"):
-                self._ui.render()
+            self._ui.move_cursor("left")
+            self._ui.render()
 
         @kb.add(Keys.Right)
         @kb.add("l")
         def _(event):
             if self._ui._search_mode:
+                self._ui.append_search_char("l")
+                self._ui.render()
                 return
             self._g_pressed = False
-            if self._ui.move_cursor("right"):
-                self._ui.render()
+            self._ui.move_cursor("right")
+            self._ui.render()
 
         @kb.add("w")
         def _(event):
@@ -73,8 +81,8 @@ class VisualModeInputHandler:
                 self._ui.render()
                 return
             self._g_pressed = False
-            if self._ui.move_cursor("word_forward"):
-                self._ui.render()
+            self._ui.move_cursor("word_forward")
+            self._ui.render()
 
         @kb.add("b")
         def _(event):
@@ -83,8 +91,8 @@ class VisualModeInputHandler:
                 self._ui.render()
                 return
             self._g_pressed = False
-            if self._ui.move_cursor("word_backward"):
-                self._ui.render()
+            self._ui.move_cursor("word_backward")
+            self._ui.render()
 
         @kb.add("0")
         def _(event):
@@ -93,8 +101,8 @@ class VisualModeInputHandler:
                 self._ui.render()
                 return
             self._g_pressed = False
-            if self._ui.move_cursor("line_start"):
-                self._ui.render()
+            self._ui.move_cursor("line_start")
+            self._ui.render()
 
         @kb.add("$")
         def _(event):
@@ -103,8 +111,8 @@ class VisualModeInputHandler:
                 self._ui.render()
                 return
             self._g_pressed = False
-            if self._ui.move_cursor("line_end"):
-                self._ui.render()
+            self._ui.move_cursor("line_end")
+            self._ui.render()
 
         @kb.add("g")
         def _(event):
@@ -114,8 +122,8 @@ class VisualModeInputHandler:
                 return
             if self._g_pressed:
                 self._g_pressed = False
-                if self._ui.move_cursor("top"):
-                    self._ui.render()
+                self._ui.move_cursor("top")
+                self._ui.render()
             else:
                 self._g_pressed = True
 
@@ -126,40 +134,40 @@ class VisualModeInputHandler:
                 self._ui.render()
                 return
             self._g_pressed = False
-            if self._ui.move_cursor("bottom"):
-                self._ui.render()
+            self._ui.move_cursor("bottom")
+            self._ui.render()
 
         @kb.add(Keys.ControlU)
         def _(event):
             if self._ui._search_mode:
                 return
             self._g_pressed = False
-            if self._ui.move_cursor("half_up"):
-                self._ui.render()
+            self._ui.move_cursor("half_up")
+            self._ui.render()
 
         @kb.add(Keys.ControlD)
         def _(event):
             if self._ui._search_mode:
                 return
             self._g_pressed = False
-            if self._ui.move_cursor("half_down"):
-                self._ui.render()
+            self._ui.move_cursor("half_down")
+            self._ui.render()
 
         @kb.add(Keys.PageUp)
         def _(event):
             if self._ui._search_mode:
                 return
             self._g_pressed = False
-            if self._ui.move_cursor("page_up"):
-                self._ui.render()
+            self._ui.move_cursor("page_up")
+            self._ui.render()
 
         @kb.add(Keys.PageDown)
         def _(event):
             if self._ui._search_mode:
                 return
             self._g_pressed = False
-            if self._ui.move_cursor("page_down"):
-                self._ui.render()
+            self._ui.move_cursor("page_down")
+            self._ui.render()
 
         @kb.add("v")
         def _(event):
@@ -232,12 +240,14 @@ class VisualModeInputHandler:
             if self._ui._search_mode:
                 self._ui.exit_search_mode(clear_results=False)
                 self._ui.render()
+                return
 
         @kb.add(Keys.Backspace)
         def _(event):
             if self._ui._search_mode:
                 self._ui.backspace_search()
                 self._ui.render()
+                return
 
         @kb.add(Keys.Escape)
         def _(event):
@@ -281,7 +291,7 @@ class VisualModeInputHandler:
                 char = event.data
                 if char and char.isprintable():
                     self._ui.append_search_char(char)
-                    self._ui.render()
+                self._ui.render()
                 return
             self._g_pressed = False
 
