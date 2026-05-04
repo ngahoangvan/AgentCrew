@@ -7,10 +7,9 @@ from AgentCrew.modules.agents.agent_runner import run_agent_loop
 def get_delegate_tool_definition() -> Dict[str, Any]:
     tool_description = (
         "Delegates a task to a specialized agent for independent execution. "
-        "The target agent completes the task and returns the result without "
-        "modifying your conversation history. You remain the active agent. "
+        "The target agent completes the task and returns the result. "
         "To delegate to MULTIPLE agents in parallel, call this tool multiple "
-        "times in the same response \u2014 all delegations will execute concurrently."
+        "times with the parallel tool calls. all delegations will execute concurrently."
     )
 
     tool_arguments = {
@@ -33,7 +32,7 @@ def get_delegate_tool_definition() -> Dict[str, Any]:
             "type": "string",
             "description": (
                 "Optional. Relevant information the target agent needs. "
-                "Include only what's necessary \u2014 the agent starts fresh."
+                "Include only what's necessary for the agent starts fresh."
             ),
         },
     }

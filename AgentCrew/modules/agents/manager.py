@@ -474,6 +474,7 @@ When system access is requested:
   <Purpose>
     Delegate tasks to specialist agents for independent execution.
     You stay active and receive results as tool output.
+    Speed up big task by devined it into sub-tasks and run in parallel.
   </Purpose>
 
   <When_To_Delegate>
@@ -484,7 +485,7 @@ When system access is requested:
 
   <Parallel_Delegation>
     To delegate to multiple agents simultaneously, call the delegate tool
-    multiple times in the SAME response. All delegations execute concurrently
+    multiple times with parallel tool calls. All delegations execute concurrently
     and you receive all results before your next response.
 
     Example: To research 3 topics, emit 3 delegate calls in one turn —
