@@ -170,6 +170,22 @@ class AgentCrewApplication:
                 services.get("voice"),
             )
 
+            # Pre-initialize the ChromaDB memory collection on the main thread.
+            # On macOS, NumPy's OpenBLAS backend crashes (SIGBUS) when first
+            # loaded inside a QThread.  Eagerly initialising the collection here
+            # ensures the heavy imports happen on the main thread while still
+            # keeping the deferred pattern for the console / A2A codepaths.
+            memory_service = services.get("memory")
+            if memory_service is not None and hasattr(
+                memory_service, "ensure_initialized"
+            ):
+                try:
+                    memory_service.ensure_initialized()
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to pre-initialize memory service on main thread: {e}"
+                    )
+
             QCoreApplication.setAttribute(Qt.ApplicationAttribute.AA_UseOpenGLES)
             app = QApplication(sys.argv)
             chat_window = ChatWindow(message_handler)

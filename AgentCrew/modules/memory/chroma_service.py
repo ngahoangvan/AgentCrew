@@ -52,6 +52,15 @@ class ChromaMemoryService(BaseMemoryService):
         self._worker: MemoryWorker = MemoryWorker(llm_service=self.llm_service)
         self._worker.start()
 
+    def ensure_initialized(self) -> None:
+        """Pre-initialize the collection on the current thread.
+
+        Call this from the main thread before the Qt event loop starts to
+        avoid macOS bus errors caused by NumPy/OpenBLAS initialization in
+        QThread contexts.  No-op if already initialized.
+        """
+        self._initialize_collection()
+
     def _initialize_collection(self) -> Collection:
         import chromadb
         import chromadb.utils.embedding_functions as embedding_functions
@@ -81,7 +90,8 @@ class ChromaMemoryService(BaseMemoryService):
             self.embedding_function = github_copilot_ef
         elif os.getenv("OPENAI_API_KEY"):
             openai_ef = embedding_functions.OpenAIEmbeddingFunction(
-                api_key=os.getenv("OPENAI_API_KEY"), model_name="text-embedding-3-small"
+                api_key=os.getenv("OPENAI_API_KEY"),
+                model_name="text-embedding-3-small",
             )
             self.embedding_function = openai_ef
         else:
