@@ -1,8 +1,25 @@
+import os
 from typing import Dict, List, Optional
 from .types import Model
-from .constants import AVAILABLE_MODELS
 from loguru import logger
 from AgentCrew.modules.config.global_config import GlobalConfig
+
+# Mapping of provider/service names to their required API key environment variables.
+# Models whose provider (or resolved service_name) maps to a key that is not set
+# in the environment will be skipped during registration.
+PROVIDER_API_KEY_MAP: Dict[str, str] = {
+    "claude": "ANTHROPIC_API_KEY",
+    "openai": "OPENAI_API_KEY",
+    "openai_response": "OPENAI_API_KEY",
+    "google": "GEMINI_API_KEY",
+    "deepinfra": "DEEPINFRA_API_KEY",
+    "together": "TOGETHER_API_KEY",
+    "opencode_go": "OPENCODE_API_KEY",
+    "opencode_anthropic": "OPENCODE_API_KEY",
+    "fireworks": "FIREWORKS_API_KEY",
+    "github_copilot": "GITHUB_COPILOT_API_KEY",
+    "copilot_response": "GITHUB_COPILOT_API_KEY",
+}
 
 
 class ModelRegistry:
@@ -82,11 +99,36 @@ class ModelRegistry:
                 f"Error loading custom LLM providers configuration for models: {e}"
             )
 
+    def _is_provider_available(self, model: Model) -> bool:
+        """Check whether the provider for a given model has its API key available."""
+        # Resolve the effective service name (falls back to provider).
+        service_name = model.resolved_service_name()
+        # Check both the service_name and the provider for an API key mapping.
+        env_var = PROVIDER_API_KEY_MAP.get(service_name) or PROVIDER_API_KEY_MAP.get(
+            model.provider
+        )
+        if env_var is None:
+            # No mapping means the provider is always available
+            # (e.g. openai_codex uses OAuth, custom providers use their own config).
+            return True
+        return bool(os.getenv(env_var))
+
     def _initialize_models(self):
         """Initialize the registry with default and custom models."""
-        # Load and register built-in models
+        # Lazily import to avoid circular dependencies between provider
+        # service modules and the LLM registry.
+        from .constants import AVAILABLE_MODELS
+
+        # Load and register built-in models, filtering out those whose
+        # provider API key is not available in the environment.
         for model in AVAILABLE_MODELS:
-            self.register_model(model)
+            if self._is_provider_available(model):
+                self.register_model(model)
+            else:
+                logger.info(
+                    f"Skipping model {model.provider}/{model.id} ({model.name}): "
+                    f"provider API key not set"
+                )
 
         # Load and register custom models from the configuration file
         self._load_custom_models_from_config()
