@@ -423,18 +423,18 @@ _DEEPINFRA_MODELS = [
         output_token_price_1m=3.40,
     ),
     Model(
-        id="Qwen/Qwen3-Max-Thinking",
+        id="Qwen/Qwen3.5-122B-A10B",
         provider="deepinfra",
-        name="Qwen 3 Max Thinking",
+        name="Qwen 3.5 Medium",
         default_reasoning="minimal",
-        description="Qwen3 is the latest generation of large language models in Qwen series, offering a comprehensive suite of dense and mixture-of-experts (MoE) models",
+        description="Qwen3.5-122B-A10B is a large Mixture-of-Experts model from Alibaba's Qwen3.5 series with 122B total parameters and 10B activated per token",
         capabilities=["tool_use", "thinking", "stream", "structured_output"],
         force_sample_params=SampleParam(
             temperature=0.6, top_p=0.95, top_k=20, min_p=0.0, repetition_penalty=1.0
         ),
         max_context_token=256_000,
-        input_token_price_1m=1.2,
-        output_token_price_1m=6,
+        input_token_price_1m=0.29,
+        output_token_price_1m=2.4,
     ),
     Model(
         id="zai-org/GLM-5",
