@@ -44,6 +44,7 @@ class ServiceManager:
             "opencode_anthropic": self._create_opencode_anthropic_service,
             "github_copilot": self._create_github_copilot_service,
             "copilot_response": self._create_copilot_response_service,
+            "fireworks": self._create_fireworks_service,
         }
 
         # Store details for custom providers
@@ -154,6 +155,14 @@ class ServiceManager:
                 api_key=api_key, provider_name=provider_name
             )
         raise RuntimeError("API key for GitHub Copilot not found.")
+
+    def _create_fireworks_service(self) -> BaseLLMService:
+        """Lazy import and create Fireworks AI service."""
+        if os.getenv("FIREWORKS_API_KEY"):
+            from AgentCrew.modules.custom_llm import FireworksService
+
+            return FireworksService()
+        raise RuntimeError("API key for Fireworks not found.")
 
     def _create_custom_llm_service(
         self,

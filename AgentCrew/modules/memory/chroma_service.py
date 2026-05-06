@@ -36,6 +36,8 @@ class ChromaMemoryService(BaseMemoryService):
                 self.llm_service.model = "gpt-4.1-nano"
             elif self.llm_service.provider_name == "deepinfra":
                 self.llm_service.model = "google/gemma-4-31B-it"
+            elif self.llm_service.provider_name == "fireworks":
+                self.llm_service.model = "accounts/fireworks/models/gemma-4-31b-it"
             elif self.llm_service.provider_name == "github_copilot":
                 self.llm_service.model = "claude-haiku-4.5"
             elif self.llm_service.provider_name == "copilot_response":

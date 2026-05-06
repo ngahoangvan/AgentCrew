@@ -274,16 +274,22 @@ class CustomLLMService(OpenAIService):
 
         return messages
 
-    async def stream_assistant_response(self, messages):
-        """Stream the assistant's response with tool support."""
+    def _build_stream_params(
+        self,
+    ) -> Tuple[Dict[str, Any], bool]:
+        """Build stream parameters for the API call.
 
-        stream_params = {
-            "model": self.model,
-            "messages": self._convert_internal_format(messages),
-            # "max_tokens": 16000,
-        }
+        Override this in derived classes to customize parameters without
+        re-implementing the entire streaming method.
+
+        Returns:
+            tuple: (stream_params_dict, is_streamable)
+        """
+        stream_params = {}
+        stream_params["model"] = self.model
         stream_params["temperature"] = self.temperature
         stream_params["extra_body"] = {"min_p": 0.02}
+        stream_params["stream_options"] = {"include_usage": True}
 
         full_model_id = f"{self._provider_name}/{self.model}"
 
@@ -309,28 +315,16 @@ class CustomLLMService(OpenAIService):
                 )
             if forced_sample_params.min_p is not None:
                 stream_params["extra_body"]["min_p"] = forced_sample_params.min_p
-        # Add system message if provided
-        if self.system_prompt:
-            stream_params["messages"] = [
-                {"role": "system", "content": self.system_prompt}
-            ] + stream_params["messages"]
 
-        # Add tools if available
-        if self.tools and "tool_use" in ModelRegistry.get_model_capabilities(
-            full_model_id
-        ):
+        model_capabilities = ModelRegistry.get_model_capabilities(full_model_id)
+
+        if self.tools and "tool_use" in model_capabilities:
             stream_params["tools"] = self.tools
 
-        if (
-            "thinking" in ModelRegistry.get_model_capabilities(full_model_id)
-            and self.reasoning_effort
-        ):
+        if "thinking" in model_capabilities and self.reasoning_effort:
             stream_params["reasoning_effort"] = self.reasoning_effort
 
-        if (
-            "structured_output" in ModelRegistry.get_model_capabilities(full_model_id)
-            and self.structured_output
-        ):
+        if "structured_output" in model_capabilities and self.structured_output:
             stream_params["response_format"] = {
                 "type": "json_schema",
                 "json_schema": {
@@ -339,7 +333,22 @@ class CustomLLMService(OpenAIService):
                 },
             }
 
-        if "stream" in ModelRegistry.get_model_capabilities(full_model_id):
+        is_streamable = "stream" in model_capabilities
+        return stream_params, is_streamable
+
+    async def stream_assistant_response(self, messages):
+        """Stream the assistant's response with tool support."""
+
+        stream_params, is_streamable = self._build_stream_params()
+
+        stream_params["messages"] = self._convert_internal_format(messages)
+
+        if self.system_prompt:
+            stream_params["messages"] = [
+                {"role": "system", "content": self.system_prompt}
+            ] + stream_params["messages"]
+
+        if is_streamable:
             self._is_thinking = False
             return await self.client.chat.completions.create(
                 **stream_params,
@@ -361,7 +370,6 @@ class CustomLLMService(OpenAIService):
                 self.current_input_tokens = 0
                 self.current_output_tokens = 0
 
-            # Return an AsyncIterator wrapping response.choices
             return AsyncIterator(response.choices)
 
     def process_stream_chunk(

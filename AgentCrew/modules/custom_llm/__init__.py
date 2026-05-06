@@ -1,5 +1,6 @@
 from .service import CustomLLMService
 from .deepinfra_service import DeepInfraService
+from .fireworks_service import FireworksService
 from .github_copilot_service import GithubCopilotService
 from .copilot_response_service import GithubCopilotResponseService
 from .opencode_service import OpenCodeService
@@ -7,6 +8,7 @@ from .opencode_service import OpenCodeService
 __all__ = [
     "CustomLLMService",
     "DeepInfraService",
+    "FireworksService",
     "GithubCopilotService",
     "GithubCopilotResponseService",
     "OpenCodeService",

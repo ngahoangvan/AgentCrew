@@ -36,6 +36,7 @@ PROVIDER_LIST = [
     "deepinfra",
     "together",
     "opencode_go",
+    "fireworks",
     "github_copilot",
 ]
 
@@ -85,6 +86,7 @@ class ApplicationSetup:
             "TOGETHER_API_KEY",
             "OPENCODE_API_KEY",
             "GITHUB_COPILOT_API_KEY",
+            "FIREWORKS_API_KEY",
             "TAVILY_API_KEY",
             "VOYAGE_API_KEY",
             "ELEVENLABS_API_KEY",
@@ -107,6 +109,7 @@ class ApplicationSetup:
                         "together": "TOGETHER_API_KEY",
                         "opencode_go": "OPENCODE_API_KEY",
                         "github_copilot": "GITHUB_COPILOT_API_KEY",
+                        "fireworks": "FIREWORKS_API_KEY",
                     }
                     if last_provider == "openai_codex":
                         from AgentCrew.modules.openai_codex.oauth import (
@@ -139,6 +142,8 @@ class ApplicationSetup:
             return "together"
         elif os.getenv("OPENCODE_API_KEY"):
             return "opencode_go"
+        elif os.getenv("FIREWORKS_API_KEY"):
+            return "fireworks"
         else:
             custom_providers = GlobalConfig().read_custom_llm_providers_config()
             if len(custom_providers) > 0:

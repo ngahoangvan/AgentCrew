@@ -3,56 +3,69 @@ import os
 from dotenv import load_dotenv
 from loguru import logger
 from typing import Dict, List, Optional, Tuple, Any
-import ast
+
+from AgentCrew.modules.llm.model_registry import ModelRegistry
 
 
-class DeepInfraService(CustomLLMService):
+class FireworksService(CustomLLMService):
+    """Fireworks AI implementation using the OpenAI-compatible API."""
+
     def __init__(self):
         load_dotenv()
-        api_key = os.getenv("DEEPINFRA_API_KEY")
+        api_key = os.getenv("FIREWORKS_API_KEY")
         if not api_key:
-            raise ValueError("DEEPINFRA_API_KEY not found in environment variables")
+            raise ValueError("FIREWORKS_API_KEY not found in environment variables")
         super().__init__(
             api_key=api_key,
-            base_url="https://api.deepinfra.com/v1/openai",
-            provider_name="deepinfra",
+            base_url="https://api.fireworks.ai/inference/v1",
+            provider_name="fireworks",
         )
-        self.model = "Qwen/Qwen3-235B-A22B"
-        self.current_input_tokens = 0
-        self.current_output_tokens = 0
+        self.model = "accounts/fireworks/models/deepseek-v4-pro"
         self._is_thinking = False
-        logger.info("Initialized DeepInfra Service")
+        logger.info("Initialized Fireworks AI Service")
 
     def _build_stream_params(self) -> Tuple[Dict[str, Any], bool]:
         stream_params, is_streamable = super()._build_stream_params()
-        stream_params["max_tokens"] = 81920
+        full_model_id = f"{self._provider_name}/{self.model}"
+        forced_sample_params = ModelRegistry.get_model_sample_params(full_model_id)
+        model_caps = ModelRegistry.get_model_capabilities(full_model_id)
+
+        if "thinking" in model_caps and self.reasoning_effort:
+            if isinstance(self.reasoning_effort, str) and self.reasoning_effort in [
+                "low",
+                "medium",
+                "high",
+                "max",
+            ]:
+                stream_params["reasoning_effort"] = self.reasoning_effort
+                stream_params.pop("max_tokens", None)
+            else:
+                extra_body = stream_params.setdefault("extra_body", {})
+                extra_body["reasoning"] = {"enabled": True}
+                stream_params.pop("max_tokens", None)
+        else:
+            if forced_sample_params:
+                if forced_sample_params.top_k is not None:
+                    extra_body = stream_params.setdefault("extra_body", {})
+                    extra_body["top_k"] = forced_sample_params.top_k
+                if forced_sample_params.min_p is not None:
+                    extra_body = stream_params.setdefault("extra_body", {})
+                    extra_body["min_p"] = forced_sample_params.min_p
+                if forced_sample_params.repetition_penalty is not None:
+                    extra_body = stream_params.setdefault("extra_body", {})
+                    extra_body["repetition_penalty"] = (
+                        forced_sample_params.repetition_penalty
+                    )
+
         return stream_params, is_streamable
 
     def _process_stream_chunk(
         self, chunk, assistant_response: str, tool_uses: List[Dict]
     ) -> Tuple[str, List[Dict], int, int, Optional[str], Optional[tuple]]:
-        """
-        Process a single chunk from the streaming response.
-
-        Args:
-            chunk: The chunk from the stream
-            assistant_response: Current accumulated assistant response
-            tool_uses: Current tool use information
-
-        Returns:
-            tuple: (
-                updated_assistant_response,
-                updated_tool_uses,
-                input_tokens,
-                output_tokens,
-                chunk_text,
-                thinking_data
-            )
-        """
         chunk_text = ""
         input_tokens = 0
         output_tokens = 0
-        thinking_content = None  # OpenAI doesn't support thinking mode
+        thinking_content = None
 
         if (not chunk.choices) or (len(chunk.choices) == 0):
             return (
@@ -65,8 +78,7 @@ class DeepInfraService(CustomLLMService):
             )
 
         delta_chunk = chunk.choices[0].delta
-        # Handle regular content chunks
-        #
+
         if (
             hasattr(delta_chunk, "reasoning_content")
             and delta_chunk.reasoning_content is not None
@@ -94,34 +106,36 @@ class DeepInfraService(CustomLLMService):
 
             if self._is_thinking:
                 chunk_text = None
-            # Remove chunk_text if still in thinking mode
 
-        # Handle final chunk with usage information
         if hasattr(chunk, "usage"):
             if hasattr(chunk.usage, "prompt_tokens"):
                 input_tokens = chunk.usage.prompt_tokens
             if hasattr(chunk.usage, "completion_tokens"):
                 output_tokens = chunk.usage.completion_tokens
 
-        # Handle tool call chunks
         if hasattr(delta_chunk, "tool_calls"):
-            delta_tool_calls = chunk.choices[0].delta.tool_calls
+            delta_tool_calls = delta_chunk.tool_calls
             if delta_tool_calls:
                 for tool_call_delta in delta_tool_calls:
-                    tool_call_index = self._merge_stream_tool_call_delta(
+                    tool_call_index = self._resolve_stream_tool_call_index(
                         tool_uses, tool_call_delta
                     )
                     if tool_call_index is None:
                         continue
 
-                    parsed_input = tool_uses[tool_call_index].get("input", {})
-                    if isinstance(parsed_input, dict):
-                        for key, value in parsed_input.items():
-                            if isinstance(value, str):
-                                try:
-                                    parsed_input[key] = ast.literal_eval(value)
-                                except Exception:
-                                    pass
+                    self._merge_stream_tool_call_delta(tool_uses, tool_call_delta)
+
+                if not chunk_text:
+                    chunk_text = ""
+
+                return (
+                    assistant_response or " ",
+                    tool_uses,
+                    input_tokens,
+                    output_tokens,
+                    chunk_text,
+                    (thinking_content, None) if thinking_content else None,
+                )
 
         return (
             assistant_response or " ",

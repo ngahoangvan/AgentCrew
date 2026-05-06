@@ -69,6 +69,11 @@ class SettingsTab(QWidget):
             "placeholder": "e.g., ...",
         },
         {
+            "label": "Fireworks API Key:",
+            "key_name": "FIREWORKS_API_KEY",
+            "placeholder": "e.g., ...",
+        },
+        {
             "label": "OpenCode API Key:",
             "key_name": "OPENCODE_API_KEY",
             "placeholder": "e.g., ...",
