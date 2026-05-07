@@ -48,7 +48,7 @@ class GoogleStreamAdapter:
     async def __anext__(self):
         """Get the next chunk from the stream generator."""
         try:
-            return self.stream_generator.__next__()
+            return await self.stream_generator.__anext__()
         except StopAsyncIteration:
             raise
         except StopIteration:
@@ -87,7 +87,7 @@ class GoogleAINativeService(BaseLLMService):
         self.tool_definitions = []  # Keep original definitions for reference
 
         self.thinking_enabled = False
-        self.thinking_budget = 0
+        self.reasoning_effort: types.ThinkingLevel = types.ThinkingLevel.HIGH
 
         # Provider name and system prompt
         self._provider_name = "google"
@@ -108,27 +108,19 @@ class GoogleAINativeService(BaseLLMService):
         Returns:
             bool: True if thinking mode is supported and successfully set, False otherwise.
         """
-        budget_tokens = int(budget_tokens)
-        if budget_tokens == 0:
-            self.thinking_enabled = False
-            self.thinking_budget = 0
-            logger.info("Thinking mode disabled.")
-            return True
         if "thinking" not in ModelRegistry.get_model_capabilities(
             f"{self._provider_name}/{self.model}"
         ):
             logger.warning("Thinking mode is disabled for this model.")
             return False
 
-        # Ensure minimum budget is 1024 tokens
-        if budget_tokens < 1024:
-            logger.warning(
-                "Warning: Minimum thinking budget is 1024 tokens. Setting to 1024."
-            )
-            budget_tokens = 1024
+        if budget_tokens == "0" or budget_tokens == "none":
+            self.thinking_enabled = False
+            self.reasoning_effort = types.ThinkingLevel.THINKING_LEVEL_UNSPECIFIED
+        elif budget_tokens not in ["minimal", "low", "medium", "high"]:
+            raise ValueError("budget_tokens must be minimal, low, medium or high")
 
-        self.thinking_enabled = True
-        self.thinking_budget = budget_tokens
+        self.reasoning_effort = types.ThinkingLevel(budget_tokens.upper())
         logger.info(f"Thinking mode enabled with budget of {budget_tokens} tokens.")
         return True
 
@@ -166,16 +158,14 @@ class GoogleAINativeService(BaseLLMService):
         output_tokens = 0
         cached_tokens = 0
 
-        stream_generator = GoogleStreamAdapter(
-            self.client.aio.models.generate_content_stream(
-                model=self.model,
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    max_output_tokens=3000,
-                    temperature=temperature,
-                    system_instruction=self.system_prompt,
-                ),
-            )
+        stream_generator = await self.client.aio.models.generate_content_stream(
+            model=self.model,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                max_output_tokens=3000,
+                temperature=temperature,
+                system_instruction=self.system_prompt,
+            ),
         )
         async for chunk in stream_generator:
             if hasattr(chunk, "text") and chunk.text:
@@ -417,9 +407,9 @@ class GoogleAINativeService(BaseLLMService):
         ):
             config.tools = self.tools
 
-        if self.thinking_enabled and self.thinking_budget > 0:
+        if self.thinking_enabled:
             config.thinking_config = types.ThinkingConfig(
-                thinking_budget=self.thinking_budget
+                include_thoughts=True, thinking_level=self.reasoning_effort
             )
 
         if (
@@ -431,7 +421,7 @@ class GoogleAINativeService(BaseLLMService):
             config.tools = None
 
         # Get the stream generator
-        stream_generator = self.client.models.generate_content_stream(
+        stream_generator = await self.client.aio.models.generate_content_stream(
             model=self.model, contents=google_messages, config=config
         )
 
@@ -453,7 +443,6 @@ class GoogleAINativeService(BaseLLMService):
         # Create a conversation in Google format
         google_messages = []
 
-        # print(messages)
         for msg in messages:
             role = msg.get("role", "")
             content = msg.get("content", "")
@@ -540,6 +529,7 @@ class GoogleAINativeService(BaseLLMService):
         output_tokens = 0
         cached_tokens = 0
         thinking_content = ""
+        stop_chunk = False
 
         if hasattr(chunk, "candidates") and chunk.candidates:
             for candidate in chunk.candidates:
@@ -550,12 +540,13 @@ class GoogleAINativeService(BaseLLMService):
                 ):
                     # get chunk text
                     for part in candidate.content.parts:
-                        if hasattr(part, "text") and part.text is not None:
+                        # get the thinking data
+                        if hasattr(part, "thought") and isinstance(part.thought, str):
+                            thinking_content += part.thought
+
+                        if hasattr(part, "text") and isinstance(part.text, str):
                             chunk_text += part.text
 
-                        # get the thinking data
-                        if hasattr(part, "thought") and part.thought is not None:
-                            thinking_content += part.thought
                         # Check if this part has a function call
                         if hasattr(part, "function_call") and part.function_call:
                             function_call = part.function_call
@@ -593,6 +584,11 @@ class GoogleAINativeService(BaseLLMService):
                                         "response": "",
                                     }
                                 )
+                if (
+                    hasattr(candidate, "finish_reason")
+                    and candidate.finish_reason is not None
+                ):
+                    stop_chunk = True
 
         assistant_response += chunk_text
         # Process tool usage information from text if present
@@ -635,7 +631,7 @@ class GoogleAINativeService(BaseLLMService):
 
                 assistant_response = re.sub(tool_pattern, "", assistant_response)
         # Process usage information if available
-        if hasattr(chunk, "usage_metadata"):
+        if stop_chunk and hasattr(chunk, "usage_metadata"):
             if hasattr(chunk.usage_metadata, "prompt_token_count"):
                 input_tokens = chunk.usage_metadata.prompt_token_count or 0
             if hasattr(chunk.usage_metadata, "candidates_token_count"):
