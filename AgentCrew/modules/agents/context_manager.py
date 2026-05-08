@@ -222,8 +222,11 @@ Skip evaluation for: simple one-sentence answers, or when the request matches "w
 
         agent = self._agent
         shrink_context_threshold = int(
-            os.getenv("AGENTCREW_DEFAULT_MAX_CONTEXT", "")
-        ) or (ModelRegistry.get_model_limit(agent.get_model()) * 0.85)
+            os.getenv(
+                "AGENTCREW_DEFAULT_MAX_CONTEXT",
+                ModelRegistry.get_model_limit(agent.get_model()) * 0.85,
+            )
+        )
 
         unique_tool_indices = []
         agent_manager = agent.services.get("agent_manager", None)
