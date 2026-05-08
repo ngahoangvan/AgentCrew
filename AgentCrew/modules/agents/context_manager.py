@@ -244,8 +244,6 @@ Skip evaluation for: simple one-sentence answers, or when the request matches "w
                 if len(msg.get("tool_calls", [])) == 0:
                     continue
 
-                msg.pop("tool_calls", None)
-
                 if is_shrinkable and i < shrink_threshold:
                     msg["tool_calls"] = [
                         t
@@ -257,6 +255,8 @@ Skip evaluation for: simple one-sentence answers, or when the request matches "w
                     #         continue
                     #     for k, _ in tool_call["arguments"].items():
                     #         tool_call["arguments"][k] = "..."
+                    if len(msg["tool_calls"]) == 0:
+                        msg.pop("tool_calls", None)
 
             elif msg.get("role") == "tool":
                 tool_name = msg.get("tool_name", "")
