@@ -77,11 +77,24 @@ wheels = [
 ]
 
 [[package]]
+name = "agent-client-protocol"
+version = "0.10.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pydantic" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/21/5c/d60196c536c8f66bb6a238c8a6d0d6fa84a2e3436008c139cb4a79003a25/agent_client_protocol-0.10.0.tar.gz", hash = "sha256:f8a6041e27423131e42e4d0cdd850d5b094b1092f79cc29501ab2bd57b92ee88", size = 81502, upload-time = "2026-05-07T19:11:56.784Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/6c/cc/139895c0c5cd2acefc365085da0735d93df0cf8427ff4ee351961090e1af/agent_client_protocol-0.10.0-py3-none-any.whl", hash = "sha256:97a1a69c5d094e2625b09c4dbc2d5cf19637c4943630ceed52ab0578ecd5e14c", size = 65400, upload-time = "2026-05-07T19:11:55.614Z" },
+]
+
+[[package]]
 name = "agentcrew-ai"
 version = "0.14.4"
 source = { editable = "." }
 dependencies = [
     { name = "a2a-sdk" },
+    { name = "agent-client-protocol" },
     { name = "anthropic" },
     { name = "chromadb" },
     { name = "click" },
@@ -150,6 +163,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "a2a-sdk", specifier = "==0.3.26" },
+    { name = "agent-client-protocol", specifier = "==0.10.0" },
     { name = "anthropic", specifier = "==0.97.0" },
     { name = "chromadb", specifier = "==1.5.8" },
     { name = "click", specifier = "==8.3.3" },

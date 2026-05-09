@@ -234,6 +234,10 @@ class LocalAgent(BaseAgent):
         """Clear all tools from the LLM service."""
         self._tool_registrar._clear_from_llm()
 
+    def resync_tools_to_llm(self):
+        self._register_tools_with_llm()
+        self._defer_tool_registration = False
+
     @property
     def clean_history(self):
         return self.history

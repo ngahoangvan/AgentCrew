@@ -10,6 +10,7 @@ from loguru import logger
 
 from AgentCrew.modules.acp.mcp import normalize_acp_mcp_servers
 from AgentCrew.modules.acp.session_store import AcpSessionStore
+from AgentCrew.modules.acp.tools.permission_broker import AcpPermissionBroker
 from AgentCrew.modules.agents import AgentManager, LocalAgent
 from AgentCrew.modules.agents.base import MessageType
 from AgentCrew.modules.mcpclient import MCPSessionManager
@@ -32,6 +33,10 @@ class AcpSessionState:
     acp_mcp_server_configs: list[Any] = field(default_factory=list)
     acp_mcp_server_ids: list[str] = field(default_factory=list)
     title: str | None = None
+    _acp_tools_configured: bool = False
+    _acp_active_terminals: dict[str, str] = field(default_factory=dict)
+    _acp_backup_tool_defs: dict[str, Any] = field(default_factory=dict)
+    permission_broker: Any | None = None
 
 
 class AgentCrewAcpAgent(Agent):
@@ -46,6 +51,7 @@ class AgentCrewAcpAgent(Agent):
         self.session_store: AcpSessionStore = session_store or AcpSessionStore()
         self._conn = None
         self._sessions: dict[str, AcpSessionState] = {}
+        self._client_capabilities: Any = None
 
     def on_connect(self, conn):
         self._conn = conn
@@ -57,6 +63,7 @@ class AgentCrewAcpAgent(Agent):
         client_info=None,
         **kwargs,
     ):
+        self._client_capabilities = client_capabilities
         from acp import PROTOCOL_VERSION
         from acp.schema import (
             AgentAuthCapabilities,
@@ -156,6 +163,7 @@ class AgentCrewAcpAgent(Agent):
             state.cancelled = True
             state.current_task.cancel()
         if state:
+            await self._restore_builtin_tools(state)
             await self._cleanup_session_mcp_servers(state, clear_configs=True)
         return self._model("CloseSessionResponse")
 
@@ -167,13 +175,20 @@ class AgentCrewAcpAgent(Agent):
             )
         else:
             state = self._sessions[session_id]
+            prev_agent_name = state.agent_name
             next_agent_name = self._resolve_agent_name(mode_id)
-            if next_agent_name != state.agent_name and state.acp_mcp_server_configs:
-                await self._cleanup_session_mcp_servers(state)
+            if next_agent_name != prev_agent_name:
+                await self._restore_builtin_tools(state)
                 state.agent_name = next_agent_name
-                for config in state.acp_mcp_server_configs:
-                    config.enabledForAgents = [next_agent_name]
-                await self._start_session_mcp_configs(state)
+                state._acp_tools_configured = False
+                if state.permission_broker:
+                    state.permission_broker.always_allowed.clear()
+                    state.permission_broker.always_denied.clear()
+                if state.acp_mcp_server_configs:
+                    await self._cleanup_session_mcp_servers(state)
+                    for config in state.acp_mcp_server_configs:
+                        config.enabledForAgents = [next_agent_name]
+                    await self._start_session_mcp_configs(state)
             else:
                 state.agent_name = next_agent_name
         await self._persist_session(session_id, self._sessions[session_id])
@@ -496,6 +511,16 @@ class AgentCrewAcpAgent(Agent):
                 state.title = user_text[:80].split("\n")[0].strip()
                 await self._send_session_info_update(session_id, state)
 
+        from AgentCrew.modules.acp.tools.context import AcpSessionContext, _current_acp_session
+
+        ctx = AcpSessionContext(
+            conn=self._conn,
+            session_id=session_id,
+            client_capabilities=self._client_capabilities,
+            active_terminals=state._acp_active_terminals,
+        )
+        token = _current_acp_session.set(ctx)
+
         state.cancelled = False
         state.current_task = asyncio.current_task()
         try:
@@ -521,6 +546,7 @@ class AgentCrewAcpAgent(Agent):
                 user_message_id=message_id,
             )
         finally:
+            _current_acp_session.reset(token)
             state.current_task = None
             await self._persist_session(session_id, state)
 
@@ -532,6 +558,75 @@ class AgentCrewAcpAgent(Agent):
         if state.current_task and not state.current_task.done():
             state.current_task.cancel()
 
+    @property
+    def _client_has_filesystem(self) -> bool:
+        caps = self._client_capabilities
+        if caps is None:
+            return False
+        fs = getattr(caps, "fs", None)
+        if fs is None:
+            return False
+        return bool(getattr(fs, "readTextFile", False) or getattr(fs, "writeTextFile", False))
+
+    @property
+    def _client_has_terminal(self) -> bool:
+        caps = self._client_capabilities
+        if caps is None:
+            return False
+        return bool(getattr(caps, "terminal", False))
+
+    async def _ensure_tools_for_session(self, session_id: str, state: AcpSessionState):
+        if state._acp_tools_configured:
+            return
+        agent = self._get_agent(state.agent_name)
+        if agent is None:
+            return
+
+        if self._client_has_filesystem:
+            from AgentCrew.modules.acp.tools.filesystem import register as register_acp_fs
+
+            replaced_filesystem = ["get_file", "write_or_edit_file"]
+            for name in replaced_filesystem:
+                if name in agent.tool_definitions:
+                    state._acp_backup_tool_defs[name] = agent.tool_definitions.pop(name)
+            register_acp_fs(agent=agent)
+
+        if self._client_has_terminal:
+            from AgentCrew.modules.acp.tools.terminal import register as register_acp_terminal
+
+            replaced_terminal = ["run_command", "check_command_status", "terminate_command"]
+            for name in replaced_terminal:
+                if name in agent.tool_definitions:
+                    state._acp_backup_tool_defs[name] = agent.tool_definitions.pop(name)
+            register_acp_terminal(agent=agent)
+
+        if state._acp_backup_tool_defs:
+            agent.resync_tools_to_llm()
+        state._acp_tools_configured = True
+
+    async def _restore_builtin_tools(self, state: AcpSessionState):
+        if not state._acp_tools_configured:
+            return
+        agent = self._get_agent(state.agent_name)
+        if agent is None:
+            return
+
+        acp_tool_names = set()
+        if self._client_has_filesystem:
+            acp_tool_names.update(["acp_read_file", "acp_write_file"])
+        if self._client_has_terminal:
+            acp_tool_names.update(["acp_run_command", "acp_check_command_status", "acp_terminate_command"])
+
+        for name in acp_tool_names:
+            agent.tool_definitions.pop(name, None)
+
+        for name, tool_def_tuple in state._acp_backup_tool_defs.items():
+            agent.tool_definitions[name] = tool_def_tuple
+
+        agent.resync_tools_to_llm()
+        state._acp_tools_configured = False
+        state._acp_backup_tool_defs.clear()
+
     async def ext_method(self, method: str, params: dict[str, Any]):
         return {"error": f"Unsupported extension method: {method}"}
 
@@ -539,6 +634,12 @@ class AgentCrewAcpAgent(Agent):
         logger.debug(f"Ignoring unsupported ACP extension notification: {method}")
 
     async def _run_turn(self, session_id: str, state: AcpSessionState):
+        if state.permission_broker is None and self._conn is not None:
+            state.permission_broker = AcpPermissionBroker(
+                conn=self._conn,
+                session_id=session_id,
+            )
+        await self._ensure_tools_for_session(session_id, state)
         agent = self._get_agent(state.agent_name)
         current_response = ""
         thinking_content = ""
@@ -630,6 +731,15 @@ class AgentCrewAcpAgent(Agent):
             if is_sequential_tool(tool_use["name"]):
                 await flush_parallel()
                 await self._send_tool_started(session_id, tool_use)
+                if state.permission_broker:
+                    permission_outcome = await state.permission_broker.request_permission(tool_use)
+                    if permission_outcome == "reject":
+                        await self._append_tool_result(
+                            session_id, state, agent, tool_use,
+                            f"Tool execution rejected by user.",
+                            is_error=True, is_rejected=True,
+                        )
+                        continue
                 try:
                     tool_result = await agent.execute_tool_call(
                         tool_use["name"],
@@ -643,7 +753,18 @@ class AgentCrewAcpAgent(Agent):
                         session_id, state, agent, tool_use, str(e), True
                     )
             else:
-                parallel_buffer.append(tool_use)
+                permission_result = "allow_once"
+                if state.permission_broker:
+                    await self._send_tool_started(session_id, tool_use)
+                    permission_result = await state.permission_broker.request_permission(tool_use)
+                if permission_result == "reject":
+                    await self._append_tool_result(
+                        session_id, state, agent, tool_use,
+                        f"Tool execution rejected by user.",
+                        is_error=True, is_rejected=True,
+                    )
+                else:
+                    parallel_buffer.append(tool_use)
 
         await flush_parallel()
 
@@ -655,10 +776,11 @@ class AgentCrewAcpAgent(Agent):
         tool_use: dict[str, Any],
         tool_result: Any,
         is_error: bool = False,
+        is_rejected: bool = False,
     ):
         result_message = agent.format_message(
             MessageType.ToolResult,
-            {"tool_use": tool_use, "tool_result": tool_result, "is_error": is_error},
+            {"tool_use": tool_use, "tool_result": tool_result, "is_error": is_error, "is_rejected": is_rejected},
         )
         if result_message:
             state.history.append(result_message)
