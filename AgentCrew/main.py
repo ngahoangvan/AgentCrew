@@ -376,6 +376,37 @@ def a2a_server(
     )
 
 
+@cli.command("acp")
+@click.option("--agent", type=str, default=None, help="Name of the local agent to expose")
+@common_options
+@click.option("--model-id", default=None, help="Model ID from provider")
+def acp_agent(
+    agent,
+    provider,
+    agent_config,
+    mcp_config,
+    memory_llm,
+    memory_path,
+    model_id,
+):
+    """Start an ACP stdio agent exposing a local AgentCrew agent"""
+    from AgentCrew.app import AgentCrewApplication
+
+    if memory_path:
+        os.environ["MEMORYDB_PATH"] = memory_path
+
+    app = AgentCrewApplication()
+    app.run_acp(
+        provider=provider,
+        model_id=model_id,
+        agent_config=agent_config,
+        mcp_config=mcp_config,
+        memory_llm=memory_llm,
+        memory_path=memory_path,
+        agent=agent,
+    )
+
+
 @cli.command()
 @click.option("--agent", type=str, help="Name of the agent to run")
 @common_options

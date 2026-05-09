@@ -264,6 +264,53 @@ class AgentCrewApplication:
         finally:
             MCPSessionManager.get_instance().cleanup()
 
+    def run_acp(
+        self,
+        provider: str | None = None,
+        model_id: str | None = None,
+        agent_config: str | None = None,
+        mcp_config: str | None = None,
+        memory_llm: str | None = None,
+        memory_path: str | None = None,
+        agent: str | None = None,
+    ) -> None:
+        from AgentCrew.modules.acp import run_acp_agent
+        from AgentCrew.modules.mcpclient import MCPSessionManager
+
+        try:
+            if provider is None:
+                provider = self.setup.detect_provider()
+                if provider is None:
+                    raise ValueError(
+                        "No LLM API key found. Please set either ANTHROPIC_API_KEY, GEMINI_API_KEY, OPENAI_API_KEY, DEEPINFRA_API_KEY, TOGETHER_API_KEY, or OPENCODE_API_KEY"
+                    )
+
+            need_memory = bool(memory_path)
+            services = self.setup.setup_services(
+                provider, memory_llm, need_memory=need_memory, model_id=model_id
+            )
+
+            if mcp_config:
+                os.environ["MCP_CONFIG_PATH"] = mcp_config
+
+            os.environ["AGENTCREW_DISABLE_GUI"] = "true"
+
+            self.setup.setup_agents(services, agent_config, provider, model_id)
+
+            if self.agent_manager is None:
+                raise ValueError("Agent manager is not initialized")
+
+            self.agent_manager.enforce_transfer = False
+            if agent:
+                self.agent_manager.select_agent(agent)
+
+            asyncio.run(run_acp_agent(self.agent_manager, agent))
+        except Exception as e:
+            logger.exception("Failed to run ACP agent")
+            click.echo(f"❌ Error: {str(e)}", err=True)
+        finally:
+            MCPSessionManager.get_instance().cleanup()
+
     def _parse_output_schema(self, schema_input: str) -> tuple[str, dict]:
         try:
             from AgentCrew.modules.prompts.constants import SCHEMA_ENFORCEMENT_PROMPT
