@@ -187,14 +187,13 @@ Apply matching behaviors from <Adaptive_Behaviors> immediately, overriding defau
             ):
                 from AgentCrew.modules.agents.manager import AgentMode
 
-                mode = agent.services["agent_manager"].agent_mode
-                if mode == AgentMode.TRANSFER:
+                if agent._colaboration_mode == AgentMode.TRANSFER:
                     eval_text = """Before processing my request, quickly evaluate inside <agent_evaluation> tags:
 - Plan out the tool call strategy for this request: which tools to call, in what order, and what inputs each needs.
 - Is another agent better suited? If yes, transfer immediately.
 Then execute your plan.
 Skip evaluation for: simple one-sentence answers, or when the request matches "when [condition], [action]" — call `learn_behavior` directly instead."""
-                elif mode == AgentMode.DELEGATE:
+                elif agent._colaboration_mode == AgentMode.DELEGATE:
                     eval_text = """Before processing my request, quickly evaluate inside <agent_evaluation> tags:
 - Plan out the tool call strategy for this request: which tools to call, in what order, and what inputs each needs.
 - Can any sub-tasks be delegated to specialist agents? If yes, delegate them.

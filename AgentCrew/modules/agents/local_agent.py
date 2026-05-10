@@ -69,6 +69,10 @@ class LocalAgent(BaseAgent):
         self._defer_tool_registration = False
         self.mcps_loading = []
 
+        from AgentCrew.modules.agents.manager import AgentMode
+
+        self._colaboration_mode = AgentMode.TRANSFER
+
         from .tool_registrar import AgentToolRegistrar
         from .context_manager import AgentContextManager
 

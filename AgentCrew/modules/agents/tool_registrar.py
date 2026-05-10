@@ -51,11 +51,11 @@ class AgentToolRegistrar:
             register_speak(voice_service, agent)
             agent.tool_prompts.append(speak_tool_prompt())
 
-        if agent.services.get("agent_manager") and not agent.is_remoting_mode:
+        if agent.services.get("agent_manager"):
             from AgentCrew.modules.agents.manager import AgentMode
 
             mode = agent.services["agent_manager"].agent_mode
-            if mode == AgentMode.TRANSFER:
+            if not agent.is_remoting_mode and mode == AgentMode.TRANSFER:
                 from AgentCrew.modules.agents.tools.transfer import (
                     register as register_transfer,
                     transfer_tool_prompt,
@@ -68,7 +68,8 @@ class AgentToolRegistrar:
                 agent.tool_prompts.append(
                     transfer_tool_prompt(agent.services["agent_manager"])
                 )
-            elif mode == AgentMode.DELEGATE:
+                agent._colaboration_mode = AgentMode.TRANSFER
+            else:  # DELEGATE MODE for remoting mode also
                 from AgentCrew.modules.agents.tools.delegate import (
                     register as register_delegate,
                     delegate_tool_prompt,
@@ -81,6 +82,7 @@ class AgentToolRegistrar:
                 agent.tool_prompts.append(
                     delegate_tool_prompt(agent.services["agent_manager"])
                 )
+                agent._colaboration_mode = AgentMode.DELEGATE
 
         for tool_name in agent.tools:
             if agent.services and tool_name in agent.services:
