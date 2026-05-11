@@ -305,6 +305,14 @@ def chat(
 
     app = AgentCrewApplication()
 
+    try:
+        from PySide6 import __version__
+
+        if __version__ != "6.11.0":
+            console = True
+    except ImportError:
+        console = True
+
     if console:
         app.run_console(
             provider, agent_config, mcp_config, memory_llm, with_voice, model_id
