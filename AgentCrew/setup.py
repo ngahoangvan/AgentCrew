@@ -425,6 +425,15 @@ tools = ["memory", "browser", "web_search", "code_analysis"]
                         llm_service = llm_manager.initialize_standalone_service(
                             remoting_provider
                         )
+
+                agent_model_id = agent_def.get("model_id")
+                resolved_llm = (
+                    AgentManager.resolve_llm_service_from_config(agent_def)
+                    if agent_model_id
+                    else None
+                )
+                if resolved_llm:
+                    llm_service = resolved_llm
                 agent = LocalAgent(
                     name=agent_def["name"],
                     description=agent_def["description"],
@@ -441,6 +450,8 @@ tools = ["memory", "browser", "web_search", "code_analysis"]
                     voice_id=agent_def.get("voice_id", None),
                 )
                 agent.set_system_prompt(agent_def["system_prompt"])
+                if resolved_llm:
+                    agent.pinned_model_id = agent_model_id
                 if remoting_provider:
                     agent.set_custom_system_prompt(
                         self.agent_manager.get_remote_system_prompt()

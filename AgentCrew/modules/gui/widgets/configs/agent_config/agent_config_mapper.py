@@ -6,6 +6,7 @@ def populate_local_agent_form(editor, agent_data: dict) -> None:
     editor.name_input.setText(agent_data.get("name", ""))
     editor.description_input.setText(agent_data.get("description", ""))
     editor.temperature_input.setText(str(agent_data.get("temperature", "0.5")))
+    editor.model_id_combo.setCurrentText(agent_data.get("model_id", ""))
     editor.enabled_checkbox.setChecked(agent_data.get("enabled", True))
 
     voice_state = agent_data.get("voice_enabled", "disabled")
@@ -27,6 +28,7 @@ def clear_local_agent_form(editor) -> None:
     editor.name_input.clear()
     editor.description_input.clear()
     editor.temperature_input.clear()
+    editor.model_id_combo.setCurrentText("")
     editor.system_prompt_input.clear()
     editor.enabled_checkbox.setChecked(True)
     editor.voice_enabled_checkbox.setChecked(False)
@@ -64,6 +66,7 @@ def collect_local_agent_form(editor) -> dict:
         "enabled": editor.enabled_checkbox.isChecked(),
         "voice_enabled": voice_state,
         "voice_id": editor.voice_id_input.text().strip(),
+        "model_id": editor.model_id_combo.currentText().strip() or None,
         "agent_type": "local",
     }
 

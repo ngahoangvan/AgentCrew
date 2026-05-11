@@ -11,7 +11,7 @@ from PySide6.QtCore import Signal
 from AgentCrew.modules.gui.themes import StyleProvider
 
 
-class DynamicFieldlist(QWidget):
+class DynamicFieldList(QWidget):
     """Reusable widget for managing dynamic key-value or single-value field rows."""
 
     dirty = Signal()

@@ -4,6 +4,7 @@ from PySide6.QtCore import Signal
 from PySide6.QtGui import QDoubleValidator
 from PySide6.QtWidgets import (
     QCheckBox,
+    QComboBox,
     QFormLayout,
     QGroupBox,
     QLabel,
@@ -60,6 +61,12 @@ class LocalAgentEditor(QWidget):
         self.temperature_input.setValidator(QDoubleValidator(0.0, 2.0, 1))
         self.temperature_input.setPlaceholderText("0.0 - 2.0")
         local_form_layout.addRow("Temperature:", self.temperature_input)
+
+        self.model_id_combo = QComboBox()
+        self.model_id_combo.setEditable(True)
+        self.model_id_combo.setPlaceholderText("(use global model)")
+        self._populate_model_id_combo()
+        local_form_layout.addRow("Model ID:", self.model_id_combo)
 
         self.enabled_checkbox = QCheckBox("Enabled")
         self.enabled_checkbox.setChecked(True)
@@ -135,12 +142,26 @@ class LocalAgentEditor(QWidget):
         self.name_input.textChanged.connect(self._on_field_changed)
         self.description_input.textChanged.connect(self._on_field_changed)
         self.temperature_input.textChanged.connect(self._on_field_changed)
+        self.model_id_combo.currentTextChanged.connect(self._on_field_changed)
         self.system_prompt_input.markdown_changed.connect(self._on_field_changed)
         self.enabled_checkbox.stateChanged.connect(self._on_field_changed)
         self.voice_enabled_checkbox.stateChanged.connect(self._on_field_changed)
         self.voice_id_input.textChanged.connect(self._on_field_changed)
         for checkbox in self.tool_checkboxes.values():
             checkbox.stateChanged.connect(self._on_field_changed)
+
+    def _populate_model_id_combo(self):
+        from AgentCrew.modules.llm.model_registry import ModelRegistry
+
+        self.model_id_combo.clear()
+        self.model_id_combo.addItem("")
+        try:
+            registry = ModelRegistry.get_instance()
+            for provider in registry.get_providers():
+                for model in registry.get_models_by_provider(provider):
+                    self.model_id_combo.addItem(f"{model.provider}/{model.id}")
+        except Exception:
+            pass
 
     def _on_field_changed(self):
         self.field_changed.emit()
@@ -153,6 +174,7 @@ class LocalAgentEditor(QWidget):
         self.name_input.setEnabled(enabled)
         self.description_input.setEnabled(enabled)
         self.temperature_input.setEnabled(enabled)
+        self.model_id_combo.setEnabled(enabled)
         self.system_prompt_input.setEnabled(enabled)
         self.enabled_checkbox.setEnabled(enabled)
         for checkbox in self.tool_checkboxes.values():
@@ -165,6 +187,7 @@ class LocalAgentEditor(QWidget):
         self.name_input.clear()
         self.description_input.clear()
         self.temperature_input.clear()
+        self.model_id_combo.setCurrentText("")
         self.system_prompt_input.clear()
         self.enabled_checkbox.setChecked(True)
         self.voice_enabled_checkbox.setChecked(False)
@@ -178,6 +201,7 @@ class LocalAgentEditor(QWidget):
         self.name_input.setText(agent_data.get("name", ""))
         self.description_input.setText(agent_data.get("description", ""))
         self.temperature_input.setText(str(agent_data.get("temperature", "0.5")))
+        self.model_id_combo.setCurrentText(agent_data.get("model_id", ""))
         self.enabled_checkbox.setChecked(agent_data.get("enabled", True))
 
         voice_state = agent_data.get("voice_enabled", "disabled")
@@ -215,5 +239,6 @@ class LocalAgentEditor(QWidget):
             "enabled": self.enabled_checkbox.isChecked(),
             "voice_enabled": voice_state,
             "voice_id": self.voice_id_input.text().strip(),
+            "model_id": self.model_id_combo.currentText().strip() or None,
             "agent_type": "local",
         }

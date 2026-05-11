@@ -70,6 +70,12 @@ class AgentsConfig:
                     else "disabled"
                 )
                 existing_agent.voice_id = agent_cfg.get("voice_id", None)
+                new_llm_svc = AgentManager.resolve_llm_service_from_config(agent_cfg)
+                if new_llm_svc:
+                    existing_agent.update_llm_service(new_llm_svc)
+                    existing_agent.pinned_model_id = agent_cfg.get("model_id")
+                else:
+                    existing_agent.pinned_model_id = None
             else:
                 clone_agent = agent_manager.get_current_agent()
                 if not isinstance(clone_agent, LocalAgent):
@@ -86,10 +92,16 @@ class AgentsConfig:
                 )
                 voice_id = agent_cfg.get("voice_id", None)
 
+                reload_llm_service = clone_agent.llm
+
+                new_llm_svc = AgentManager.resolve_llm_service_from_config(agent_cfg)
+                if new_llm_svc:
+                    reload_llm_service = new_llm_svc
+
                 new_agent = LocalAgent(
                     name=agent_cfg["name"],
                     description=agent_cfg["description"],
-                    llm_service=clone_agent.llm,
+                    llm_service=reload_llm_service,
                     services=clone_agent.services,
                     tools=agent_cfg["tools"],
                     temperature=agent_cfg.get("temperature", None),
@@ -97,6 +109,8 @@ class AgentsConfig:
                     voice_id=voice_id,
                 )
                 new_agent.set_system_prompt(system_prompt)
+                if new_llm_svc:
+                    new_agent.pinned_model_id = agent_cfg.get("model_id")
                 agent_manager.register_agent(new_agent)
 
         new_agent_names = [a["name"] for a in new_agents_config]

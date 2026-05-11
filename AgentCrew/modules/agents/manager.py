@@ -2,7 +2,7 @@ import tomllib as toml
 import json
 from enum import Enum
 from typing import Any
-
+from loguru import logger
 from .base import BaseAgent
 from .local_agent import LocalAgent
 
@@ -348,8 +348,37 @@ class AgentManager:
 
         # Update all other agents' LLM service but keep them deactivated
         for _, agent in self.agents.items():
-            if isinstance(agent, LocalAgent):
+            if isinstance(agent, LocalAgent) and not agent.pinned_model_id:
                 agent.update_llm_service(llm_service)
+        # If current_agent than force update llm_service even with pinned_model_id
+        if isinstance(self.current_agent, LocalAgent):
+            self.current_agent.update_llm_service(llm_service)
+
+    @staticmethod
+    def resolve_llm_service_from_config(agent_cfg):
+
+        from AgentCrew.modules.llm.model_registry import ModelRegistry
+        from AgentCrew.modules.llm.service_manager import ServiceManager
+
+        registry = ModelRegistry.get_instance()
+        llm_manager = ServiceManager.get_instance()
+        agent_model_id = agent_cfg.get("model_id", None)
+        model = registry.get_model(agent_model_id)
+        if model:
+            try:
+                new_svc = llm_manager.initialize_standalone_service_for_model(model)
+                llm_manager.apply_model_defaults(new_svc, model.provider, model.id)
+                new_svc.model = model.id
+                return new_svc
+            except Exception as e:
+                logger.warning(
+                    f"Could not update model for existing agent '{agent_cfg['name']}': {e}"
+                )
+        else:
+            logger.warning(
+                f"model_id '{agent_model_id}' not found in registry for agent '{agent_cfg['name']}', keeping current service"
+            )
+        return None
 
     def get_remote_system_prompt(self):
         return """

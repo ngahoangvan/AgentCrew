@@ -25,7 +25,7 @@ class ModelCommands:
         """
         model_id = command[7:].strip()
         registry = ModelRegistry.get_instance()
-        manager = ServiceManager.get_instance()
+        llm_manager = ServiceManager.get_instance()
 
         if not model_id:
             models_by_provider = {}
@@ -54,9 +54,9 @@ class ModelCommands:
         if registry.set_current_model(model_id):
             model = registry.get_current_model()
             if model:
-                manager.set_model_for_model(model)
+                llm_manager.set_model_for_model(model)
 
-                new_llm_service = manager.get_service_for_model(model)
+                new_llm_service = llm_manager.get_service_for_model(model)
 
                 self.message_handler.agent_manager.update_llm_service(new_llm_service)
 

@@ -56,6 +56,7 @@ class LocalAgent(BaseAgent):
         self.custom_system_prompt = None
         self.tool_prompts = []
         self.is_remoting_mode: bool = is_remoting_mode
+        self.pinned_model_id: str | None = None
         self.token_usage = TokenUsage()
         self.voice_enabled: Literal["enabled", "disabled"] = normalize_voice_enabled(
             voice_enabled
