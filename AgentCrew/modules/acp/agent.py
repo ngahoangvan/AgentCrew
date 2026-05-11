@@ -69,7 +69,6 @@ class AgentCrewAcpAgent(Agent):
         self._tool_manager.update_capabilities(client_capabilities)
         from acp import PROTOCOL_VERSION
         from acp.schema import (
-            AgentAuthCapabilities,
             AgentCapabilities,
             Implementation,
             InitializeResponse,
@@ -79,14 +78,40 @@ class AgentCrewAcpAgent(Agent):
             SessionCloseCapabilities,
             SessionListCapabilities,
             SessionResumeCapabilities,
+            TerminalAuthMethod,
+            AuthMethodAgent,
+            EnvVarAuthMethod,
         )
 
         import AgentCrew
 
+        auth_methods: list[AuthMethodAgent | TerminalAuthMethod | EnvVarAuthMethod] = [
+            AuthMethodAgent(
+                id="agentcrew-auth",
+                name="Agentcrew Api keys Auththenticate",
+                description="Set API Keys in config to use Agentcrew",
+            )
+        ]
+
+        if (
+            client_capabilities
+            and hasattr(client_capabilities, "_meta")
+            and client_capabilities._meta
+            and client_capabilities._meta.get("terminal-auth") is True
+        ):
+            auth_methods.append(
+                TerminalAuthMethod(
+                    type="terminal",
+                    id="chatgpt-codex",
+                    name="ChatGPT (Codex)",
+                    description="Authenticate with ChatGPT subscription (Plus/Pro) for Codex API access",
+                    args=["chatgpt-auth"],
+                ),
+            )
+
         return InitializeResponse(
             protocol_version=PROTOCOL_VERSION,
             agent_capabilities=AgentCapabilities(
-                auth=AgentAuthCapabilities(),
                 load_session=True,
                 mcp_capabilities=McpCapabilities(http=False, sse=False),
                 prompt_capabilities=PromptCapabilities(embedded_context=True),
@@ -101,6 +126,7 @@ class AgentCrewAcpAgent(Agent):
                 title="AgentCrew",
                 version=getattr(AgentCrew, "__version__", "0.0.0"),
             ),
+            auth_methods=auth_methods,
         )
 
     async def authenticate(self, method_id: str, **kwargs):
