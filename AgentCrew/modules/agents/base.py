@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 from enum import Enum
 
 if TYPE_CHECKING:
-    from typing import AsyncGenerator, Tuple, Any, Callable, Union
+    from typing import AsyncGenerator, Any, Callable, Union
 
 
 class MessageType(Enum):
@@ -104,10 +104,3 @@ class BaseAgent(ABC):
             The processed messages with the agent's response
         """
         yield
-
-    @abstractmethod
-    def get_process_result(self) -> Tuple:
-        """
-        @DEPRECATED: Use the callback in process_messages instead.
-        """
-        pass

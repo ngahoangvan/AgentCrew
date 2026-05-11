@@ -511,9 +511,3 @@ class LocalAgent(BaseAgent):
             logger.error(f"Error during message processing: {e}")
             logger.debug(f"Final messages at error time: {final_messages}")
             raise e
-
-    def get_process_result(self):
-        """
-        @DEPRECATED: Use the callback in process_messages instead.
-        """
-        return (self.tool_uses, self.token_usage)

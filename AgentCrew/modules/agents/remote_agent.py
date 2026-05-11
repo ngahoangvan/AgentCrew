@@ -22,7 +22,7 @@ from a2a.types import (
 )
 
 if TYPE_CHECKING:
-    from typing import Callable, Any, Tuple, Union
+    from typing import Callable, Any, Union
 
 
 class RemoteAgent(BaseAgent):
@@ -214,9 +214,3 @@ class RemoteAgent(BaseAgent):
                 )
                 await asyncio.sleep(wait_time)
                 is_resubscribe = True
-
-    def get_process_result(self) -> Tuple:
-        """
-        @DEPRECATED: Use the callback in process_messages instead.
-        """
-        return ([], 0, 0)
