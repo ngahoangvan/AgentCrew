@@ -1,9 +1,14 @@
 from dataclasses import dataclass
 from datetime import datetime as dt
-from typing import Any, Callable
+from typing import TYPE_CHECKING, Any, Callable
+
+from loguru import logger
 
 from .base_service import BaseMemoryService
 from .context_persistent import ContextPersistenceService
+
+if TYPE_CHECKING:
+    from AgentCrew.modules.llm.base import BaseLLMService
 
 
 @dataclass(frozen=True)
@@ -11,6 +16,7 @@ class MemoryToolContext:
     agent_name: str
     memory_service: BaseMemoryService | None = None
     persistence_service: ContextPersistenceService | None = None
+    llm_service: "BaseLLMService | None" = None
 
 
 def _coerce_memory_service_context(
@@ -261,6 +267,51 @@ All behaviors must follow 'when..., [action]...' format for automatic activation
     }
 
 
+async def _normalize_behavior(
+    llm_service,
+    new_id: str,
+    new_behavior: str,
+    existing_behaviors: dict[str, str],
+) -> tuple[str, str]:
+    """Calls LLM to clean and merge behavior text with graceful fallback."""
+    import json
+    import re
+
+    try:
+        existing_section = "\n".join(
+            f"{bid}: {btext}" for bid, btext in existing_behaviors.items()
+        ) or "(none)"
+        prompt = f"""You are a behavior normalizer. Clean up, deduplicate, and merge adaptive behavior rules.
+
+EXISTING BEHAVIORS:
+{existing_section}
+
+NEW BEHAVIOR TO STORE:
+ID: {new_id}
+Behavior: {new_behavior}
+
+Rules:
+- If the new behavior duplicates or is a subset of an existing one, merge them into one improved behavior.
+- If the new behavior conflicts with an existing one, keep the new one (it overrides).
+- Clean up grammar, redundancy, and formatting. All behaviors MUST start with \"when\".
+- Prefer the existing ID when merging for stability.
+- Return ONLY a JSON object: {{\"id\": \"<id>\", \"behavior\": \"<cleaned behavior string>\"}}"""
+
+        response = await llm_service.process_message(prompt, temperature=0)
+        match = re.search(r"\{.*\}", response, re.DOTALL)
+        if not match:
+            return new_id, new_behavior
+        data = json.loads(match.group())
+        norm_id = data.get("id", new_id).strip() or new_id
+        norm_behavior = data.get("behavior", new_behavior).strip()
+        if not norm_behavior.lower().startswith("when"):
+            return new_id, new_behavior
+        return norm_id, norm_behavior
+    except Exception as e:
+        logger.warning(f"Behavior normalization failed, storing raw: {e}")
+        return new_id, new_behavior
+
+
 def get_learn_behavior_tool_handler(
     bound_instance: ContextPersistenceService | MemoryToolContext,
 ) -> Callable:
@@ -308,6 +359,18 @@ def get_learn_behavior_tool_handler(
                 f"{i + 1}. {step}" for i, step in enumerate(action_steps)
             )
             behavior = f"when {condition}, do run following steps: {steps_joined}"
+
+        if context.llm_service:
+            existing = persistence_service.get_adaptive_behaviors(
+                context.agent_name,
+                is_local=(scope == "project"),
+            )
+            behavior_id, behavior = await _normalize_behavior(
+                context.llm_service,
+                behavior_id,
+                behavior,
+                existing,
+            )
 
         try:
             success = persistence_service.store_adaptive_behavior(
@@ -369,6 +432,7 @@ def register(
     service_instance=None,
     persistence_service=None,
     agent=None,
+    llm_service=None,
 ):
     """Register optimized memory tools with comprehensive capabilities."""
     from AgentCrew.modules.tools.registration import register_tool
@@ -396,6 +460,7 @@ def register(
         persistence_context = MemoryToolContext(
             agent_name=agent_name,
             persistence_service=persistence_service,
+            llm_service=llm_service,
         )
         register_tool(
             get_learn_behavior_tool_definition,

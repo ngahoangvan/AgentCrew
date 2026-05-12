@@ -99,6 +99,7 @@ class AgentToolRegistrar:
                             service,
                             agent.services.get("context_persistent", None),
                             agent,
+                            agent.llm,
                         )
                         agent.tool_prompts.append(memory_instruction_prompt())
                         agent.tool_prompts.append(adaptive_instruction_prompt())
