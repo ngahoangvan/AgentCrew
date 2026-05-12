@@ -176,10 +176,7 @@ class ApplicationSetup:
                 last_model_class = registry.get_model(last_model)
                 if should_restore and last_model_class:
                     llm_service = llm_manager.get_service_for_model(last_model_class)
-                    llm_manager.apply_model_defaults(
-                        llm_service, last_model_class.provider, last_model_class.id
-                    )
-                    llm_service.model = last_model_class.id
+                    llm_manager.apply_model_defaults(llm_service, last_model_class)
         except Exception as e:
             logger.warning(f"Could not restore last used model: {e}")
             click.echo(f"\u26a0\ufe0f  Could not restore last used model: {e}")
@@ -310,7 +307,7 @@ class ApplicationSetup:
         self,
         services: dict[str, Any],
         config_uri: str | None = None,
-        remoting_provider: str | None = None,
+        standalone_provider: str | None = None,
         model_id: str | None = None,
     ) -> AgentManager:
         self.agent_manager = AgentManager.get_instance()
@@ -354,7 +351,7 @@ class ApplicationSetup:
         except FileNotFoundError:
             pass
 
-        if not agent_definitions and not remoting_provider:
+        if not agent_definitions and not standalone_provider:
             from AgentCrew.modules.onboarding import OnboardingService
 
             onboarding = OnboardingService(services["llm"], services=services)
@@ -403,7 +400,7 @@ tools = ["memory", "browser", "web_search", "code_analysis"]
                     )
                     continue
             else:
-                if remoting_provider:
+                if standalone_provider:
                     if model_id:
                         model = registry.get_model(model_id)
                         if model:
@@ -412,18 +409,15 @@ tools = ["memory", "browser", "web_search", "code_analysis"]
                                     model
                                 )
                             )
-                            llm_manager.apply_model_defaults(
-                                llm_service, model.provider, model.id
-                            )
-                            llm_service.model = model.id
+                            llm_manager.apply_model_defaults(llm_service, model)
                         else:
                             llm_service = llm_manager.initialize_standalone_service(
-                                remoting_provider
+                                standalone_provider
                             )
                             llm_service.model = model_id
                     else:
                         llm_service = llm_manager.initialize_standalone_service(
-                            remoting_provider
+                            standalone_provider
                         )
 
                 agent_model_id = agent_def.get("model_id")
@@ -452,7 +446,7 @@ tools = ["memory", "browser", "web_search", "code_analysis"]
                 agent.set_system_prompt(agent_def["system_prompt"])
                 if resolved_llm:
                     agent.pinned_model_id = agent_model_id
-                if remoting_provider:
+                if standalone_provider:
                     agent.set_custom_system_prompt(
                         self.agent_manager.get_remote_system_prompt()
                     )
@@ -463,7 +457,7 @@ tools = ["memory", "browser", "web_search", "code_analysis"]
 
         mcp_register()
 
-        if remoting_provider:
+        if standalone_provider:
             from AgentCrew.modules.mcpclient import MCPSessionManager
 
             mcp_manager = MCPSessionManager.get_instance()

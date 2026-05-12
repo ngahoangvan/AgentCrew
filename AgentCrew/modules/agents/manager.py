@@ -367,8 +367,7 @@ class AgentManager:
         if model:
             try:
                 new_svc = llm_manager.initialize_standalone_service_for_model(model)
-                llm_manager.apply_model_defaults(new_svc, model.provider, model.id)
-                new_svc.model = model.id
+                llm_manager.apply_model_defaults(new_svc, model)
                 return new_svc
             except Exception as e:
                 logger.warning(

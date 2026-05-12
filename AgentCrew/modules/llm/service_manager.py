@@ -339,35 +339,14 @@ class ServiceManager:
         # Fallback: treat provider as a direct service name
         return self.get_service(provider)
 
-    def set_model(self, service_name: str, model_id: str) -> bool:
-        """
-        Set the model for a specific service.
-
-        Args:
-            service_name: The service implementation name
-            model_id: The model ID to use
-
-        Returns:
-            True if successful, False otherwise
-        """
-        service = self.get_service(service_name)
-        if hasattr(service, "model"):
-            service.model = model_id
-            self.apply_model_defaults(service, service_name, model_id)
-            return True
-        return False
-
     def set_model_for_model(self, model: Model):
         """Set the model on the service instance declared by the given model."""
         service = self.get_service_for_model(model)
         service.model = model.id
-        self.apply_model_defaults(service, model.provider, model.id)
+        self.apply_model_defaults(service, model)
 
-    def apply_model_defaults(
-        self, service: BaseLLMService, provider: str, model_id: str
-    ) -> None:
-        full_model_id = f"{provider}/{model_id}"
-        model = ModelRegistry.get_instance().get_model(full_model_id)
+    def apply_model_defaults(self, service: BaseLLMService, model: Model) -> None:
+        service.model = model.id
         if not model or not hasattr(service, "reasoning_effort"):
             return
 

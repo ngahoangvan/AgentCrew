@@ -120,9 +120,8 @@ class ModelController:
             )
 
         manager = ServiceManager.get_instance()
-        registry.set_current_model(model_id)
-        manager.set_model_for_model(model)
-        new_llm_service = manager.get_service_for_model(model)
+        new_llm_service = manager.initialize_standalone_service_for_model(model)
+        manager.apply_model_defaults(new_llm_service, model)
         self._get_agent(state.agent_name).update_llm_service(new_llm_service)
         state.model_id = model_id
         state.thought_level = self.validated_thought_level_for_model(

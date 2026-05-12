@@ -69,7 +69,7 @@ class AgentToolRegistrar:
                     transfer_tool_prompt(agent.services["agent_manager"])
                 )
                 agent._colaboration_mode = AgentMode.TRANSFER
-            else:  # DELEGATE MODE for remoting mode also
+            elif mode != AgentMode.NONE:  # DELEGATE MODE for remoting mode also
                 from AgentCrew.modules.agents.tools.delegate import (
                     register as register_delegate,
                     delegate_tool_prompt,
