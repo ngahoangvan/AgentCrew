@@ -140,6 +140,7 @@ class OpenAIResponseService(BaseLLMService):
             "input": prompt,
             "stream": True,
             "instructions": self.system_prompt or None,
+            "service_tier": "default",
         }
         if self._extra_headers:
             request_params["extra_headers"] = self._extra_headers
